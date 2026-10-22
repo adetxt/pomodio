@@ -10,5 +10,5 @@ export const PRESETS={
   rain:{cloud:.92,sky:.96,fog:.3,rain:.78,wind:.7,storm:0,petals:.1},
   storm:{cloud:1,sky:1,fog:.34,rain:1,wind:1,storm:1,petals:.05},
 };
-export const state={hour:12,live:true,weather:store.get('weather','clear'),tilt:store.get('tilt',.7),wet:0};
+export const state={hour:12,live:true,weather:store.get('weather','clear'),tilt:store.get('tilt',.7),res:store.get('res',1),wet:0};
 export const W={...PRESETS[state.weather]};

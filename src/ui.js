@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { $, clamp, ico, pick, store } from './utils.js';
 import { PRESETS, W, state } from './state.js';
-import { camera, canvasEl } from './renderer.js';
+import { camera, canvasEl, resize } from './renderer.js';
 import { CHANNELS, sound, syncAudioUI } from './audio.js';
 import { ROLE_MOOD, ROLE_TITLE, marker, pickables, raining } from './citizens.js';
 import { env } from './weather.js';
@@ -40,6 +40,8 @@ $('muteBtn').onclick=()=>{sound.muted=!sound.muted;sound.applyLevels();syncAudio
 $('musicBtn').onclick=()=>{sound.autoPaused=false;sound.setMusic(!sound.musicOn);syncAudioUI();};
 $('mixBtn').onclick=()=>{$('mixer').hidden=!$('mixer').hidden;$('mixBtn').classList.toggle('on',!$('mixer').hidden);};
 $('tilt').value=state.tilt;$('tilt').oninput=e=>{state.tilt=+e.target.value;store.set('tilt',state.tilt);};
+const RES=[1,.75,.5],syncRes=()=>{$('resBtn').textContent=Math.round(state.res*100)+'%';};
+$('resBtn').onclick=()=>{state.res=RES[(RES.indexOf(state.res)+1)%RES.length];store.set('res',state.res);syncRes();resize();};syncRes();
 function toggleUI(){document.body.classList.toggle('clean');$('showUi').hidden=!document.body.classList.contains('clean');}
 $('hideBtn').onclick=toggleUI;$('showUi').onclick=toggleUI;
 function enter(muted){if(muted){sound.muted=true;}sound.init();sound.applyLevels();syncAudioUI();$('splash').remove();}

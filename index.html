@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pomodio — Pixel Park Sanctuary</title>
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
 </head>
 <body>
@@ -86,6 +86,7 @@
     <button id="mixBtn" title="Sound mixer"><svg class="i"><use href="#i-mixer"/></svg><span>Mixer</span></button>
     <span class="spacer"></span>
     <label class="tilt"><span class="lbl">Tilt-shift</span><input type="range" id="tilt" min="0" max="1" step="0.01"></label>
+    <button id="resBtn" title="Render resolution (lower is faster)">100%</button>
     <span class="divider"></span>
     <button id="hideBtn" class="icon ghost" title="Hide controls (H)"><svg class="i"><use href="#i-eye-off"/></svg></button>
   </div>

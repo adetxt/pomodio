@@ -2,7 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 import { $, clamp, ico } from './utils.js';
 import { W, state } from './state.js';
-import { camAz, camRight, camera, passH, passV, quad, quadCam, quadScene, renderer, resize, rtBlur, rtScene, scene, updateCamera } from './renderer.js';
+import { camAz, camRight, camera, passCloud, passH, passV, quad, quadCam, quadScene, renderer, resize, rtBlur, rtCloud, rtScene, scene, updateCamera } from './renderer.js';
 import { boat, staticBillboards, trees } from './city.js';
 import { sound } from './audio.js';
 import { SPRITE_TILT, agents, marker } from './citizens.js';
@@ -15,9 +15,13 @@ import { selected, tod, todIcon, updateCard } from './ui.js';
    ===================================================================== */
 addEventListener('resize',resize);resize();
 let last=performance.now(),clock=0,todUi=0;
-let cardT=0;
+let cardT=0,shadowT=0,due=0;
 const _hand=new THREE.Vector3(),_col2=new THREE.Vector3();
 function frame(now){
+  // cap at 60fps (30 while focusing): high-refresh displays would otherwise render 120+ frames/s
+  const focusing=document.body.classList.contains('focusing');
+  if(now<due-1){requestAnimationFrame(frame);return;}
+  due=Math.max(due+1000/(focusing?30:60),now);
   const dt=clamp((now-last)/1000,0,.05);last=now;clock+=dt;
   if(state.live)state.hour=localHour();
   todUi-=dt;if(todUi<0){todUi=.25;if(document.activeElement!==tod)tod.value=state.hour;const hh=Math.floor(state.hour),mm=Math.floor((state.hour-hh)*60);
@@ -36,10 +40,12 @@ function frame(now){
   updateParticles(dt,clock,env);
   drawBolt(dt);
   sound.update(dt,env);
-  const dimT=document.body.classList.contains('focusing')?1:0;passV.uniforms.uDim.value+=(dimT-passV.uniforms.uDim.value)*Math.min(1,dt*1.5);
+  const dimT=focusing?1:0;passV.uniforms.uDim.value+=(dimT-passV.uniforms.uDim.value)*Math.min(1,dt*1.5);
   passV.uniforms.uTime.value=clock;
+  shadowT-=dt;if(shadowT<0){shadowT=1/15;renderer.shadowMap.needsUpdate=true;}
   renderer.setRenderTarget(rtScene);renderer.render(scene,camera);
   quad.material=passH;passH.uniforms.tDiffuse.value=rtScene.texture;renderer.setRenderTarget(rtBlur);renderer.render(quadScene,quadCam);
+  quad.material=passCloud;renderer.setRenderTarget(rtCloud);renderer.render(quadScene,quadCam);
   quad.material=passV;passV.uniforms.tDiffuse.value=rtBlur.texture;renderer.setRenderTarget(null);renderer.render(quadScene,quadCam);
   requestAnimationFrame(frame);
 }

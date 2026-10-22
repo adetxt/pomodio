@@ -13,6 +13,7 @@ import { agents } from './citizens.js';
    ===================================================================== */
 const petals=new PointCloud(380),dust=new PointCloud(160,{additive:true,soft:true,tint:false}),flies=new PointCloud(70,{additive:true,soft:true,tint:false});
 const spray=new PointCloud(260,{soft:true}),steam=new PointCloud(90,{soft:true});
+const DEW=new THREE.Color('#dff4ff'),GOLD=new THREE.Color('#ffd98a');
 const PETAL_COLS=['#f7c1d2','#f0a4bd','#ffe3ec','#e9873a','#f2b34c','#d9622b','#c8483e'].map(c=>new THREE.Color(c));
 const blossomTrees=trees.filter(t=>t.type==='cherry'||t.type==='autumn');
 const pState=[];
@@ -62,10 +63,9 @@ export function updateParticles(dt,t,env){
     if(Math.abs(p[i*3])>GW/2||p[i*3+2]>GZ0+GD||p[i*3+2]<GZ0)respawnPetal(i);}
   petals.commit();
   // dust motes / morning dew glints
-  const dawn=Math.exp(-(((env.hour-7)/1.4)**2)),dustA=env.day*(1-W.cloud)*(.25+.75*Math.max(env.golden,dawn))*(1-W.rain);
+  const dawn=Math.exp(-(((env.hour-7)/1.4)**2)),dustA=env.day*(1-W.cloud)*(.25+.75*Math.max(env.golden,dawn))*(1-W.rain),dustCol=dawn>env.golden?DEW:GOLD;
   for(let i=0;i<dust.n;i++){const p=dust.pos;p[i*3]+=Math.sin(t*.3+i)*.08*dt+wind*.15*dt;p[i*3+1]+=Math.sin(t*.5+i*1.7)*.06*dt;p[i*3+2]+=Math.cos(t*.27+i*.7)*.08*dt;
-    if(p[i*3]>14)p[i*3]=-14;dust.alpha[i]=dustA*(.4+.6*Math.sin(t*1.3+i*2.1)**2)*.85;
-    _col.set(dawn>env.golden?'#dff4ff':'#ffd98a');dust.setColor(i,_col);}
+    if(p[i*3]>14)p[i*3]=-14;dust.alpha[i]=dustA*(.4+.6*Math.sin(t*1.3+i*2.1)**2)*.85;dust.setColor(i,dustCol);}
   dust.commit();
   // fireflies
   const flyA=env.night*(1-W.rain)*(1-W.fog*.5);

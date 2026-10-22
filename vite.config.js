@@ -11,7 +11,7 @@ export default defineConfig({
   build: { cssMinify: false },
   resolve: {
     alias: [
-      { find: /^three$/, replacement: THREE_CDN + 'build/three.module.js' },
+      { find: /^three$/, replacement: THREE_CDN + 'build/three.module.min.js' },
       { find: /^three\/addons\//, replacement: THREE_CDN + 'examples/jsm/' },
     ],
   },

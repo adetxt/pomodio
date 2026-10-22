@@ -4,7 +4,7 @@ import { scene } from './renderer.js';
 import { barkMat, brickCanvas, checkerC, flowerTopC, glowTex, hedgeC, leafCanvas, metalMat, plasterCanvas, roofCanvas, stoneMat, stripeC, woodMat } from './textures.js';
 import { COURT, GW, GX0 } from './ground.js';
 import { makeWater } from './shaders.js';
-import { lamps } from './lights.js';
+import { addLampLight, lamps, litByLamps } from './lights.js';
 
 /* =====================================================================
    6. City & park construction
@@ -130,8 +130,7 @@ function addLamp(x,z,light=true){
   const cap=new THREE.Mesh(new THREE.ConeGeometry(.28,.22,4),metalMat);cap.position.y=3.08;cap.rotation.y=Math.PI/4;g.add(cap);
   const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:'#ffc477',blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0,fog:false}));
   halo.position.y=2.78;halo.scale.set(3.2,3.2,1);g.add(halo);
-  let pl=null;if(light){pl=new THREE.PointLight('#ffc47a',0,10,1.6);pl.position.y=2.6;g.add(pl);}
-  scene.add(g);lamps.push({glassMat,halo,pl,level:0,th:rand(.3,.46),flaky:Math.random()<.15,flick:1});
+  scene.add(g);lamps.push({glassMat,halo,light:light?addLampLight(x,2.6,z,10,1.6,'#ffc47a'):null,level:0,th:rand(.3,.46),flaky:Math.random()<.15,flick:1});
 }
 for(const a of [45,135,225,315]){const r=5.4,t=a*Math.PI/180;addLamp(Math.cos(t)*r,Math.sin(t)*r,true);}
 for(const x of [-10,10])addLamp(x,-9.35,true);
@@ -204,7 +203,7 @@ export let fountainLight;
   const bowl=new THREE.Mesh(new THREE.CylinderGeometry(.95,.45,.28,16),stoneMat);bowl.position.y=1.48;bowl.castShadow=true;scene.add(bowl);
   const bw=new THREE.Mesh(new THREE.CircleGeometry(.88,16).rotateX(-Math.PI/2),makeWater({deep:'#2a6d86',shallow:'#6fc0d4',glow:1}));bw.position.y=1.6;scene.add(bw);
   const sp=new THREE.Mesh(new THREE.CylinderGeometry(.08,.12,.4,6),stoneMat);sp.position.y=1.8;scene.add(sp);
-  fountainLight=new THREE.PointLight('#bfe6ff',0,8,1.5);fountainLight.position.set(0,1.2,0);scene.add(fountainLight);
+  fountainLight=addLampLight(0,1.2,0,8,1.5,'#bfe6ff');
 }
 // Pond with lily pads and reeds
 {
@@ -313,3 +312,5 @@ export const puddleMat=makeWater({deep:'#3a4a5a',shallow:'#6a8090',opacity:0});
 for(const [x,z,sx,sz] of [[-9,-12.4,1.2,.6],[3.5,-13.8,.9,.5],[15,-12.2,1,.55],[-3,-8.7,.7,.4],[-14.6,2.5,.6,.9],[4,9,.9,.45],[-10.5,9.1,.7,.4],
   [-11.4,-1.5,.5,.8],[8.2,-6.4,.8,.4],[0,-6.4,.6,.35],[19,1.5,.9,.6],[-18,-17.8,.8,.5],[11,-11.3,1,.5]]){
   const m=new THREE.Mesh(new THREE.CircleGeometry(1,14).rotateX(-Math.PI/2),puddleMat);m.scale.set(sx,1,sz);m.position.set(x,.015,z);m.renderOrder=2;scene.add(m);}
+// every lit material picks up the lamp lights
+scene.traverse(o=>{for(const m of [].concat(o.material||[]))if(m.isMeshStandardMaterial)m.onBeforeCompile=litByLamps;});

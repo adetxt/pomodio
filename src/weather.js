@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { clamp, lerp, rand, smoothstep } from './utils.js';
 import { PRESETS, W, state } from './state.js';
-import { boltCv, boltG, camAz, passH, passV, renderer, scene } from './renderer.js';
+import { boltCv, boltG, camAz, passH, passV, scene } from './renderer.js';
 import { groundMat } from './ground.js';
 import { fogMats, waters } from './shaders.js';
-import { hemi, lamps, sun } from './lights.js';
+import { hemi, lampU, lamps, sun } from './lights.js';
 import { buildings, fountainLight, puddleMat } from './city.js';
 import { sound } from './audio.js';
 import { setRaining, spriteMats } from './citizens.js';
@@ -28,6 +28,7 @@ const SK={top:new THREE.Color(),bot:new THREE.Color(),sun:new THREE.Color(),hs:n
 function sampleSky(h){let i=0;while(i<SKY.length-2&&h>=SKY[i+1].h)i++;const a=SKY[i],b=SKY[i+1],t=clamp((h-a.h)/(b.h-a.h),0,1);
   for(const k of ['top','bot','sun','hs','hg','tint'])SK[k].lerpColors(a[k],b[k],t);SK.sunI=lerp(a.sunI,b.sunI,t);SK.hI=lerp(a.hI,b.hI,t);SK.day=lerp(a.day,b.day,t);}
 const GREY=new THREE.Color('#8a90a0'),GREY_TOP=new THREE.Color('#6b7382'),_c1=new THREE.Color(),_c2=new THREE.Color(),_c3=new THREE.Color(),_c4=new THREE.Color(),_v=new THREE.Vector3(),_rgb={r:0,g:0,b:0};
+const HAZE=new THREE.Color('#e6e9ef'),FOG_DAY=new THREE.Color('#dfe4ea'),LAMP_GLOW=new THREE.Color('#ffb060'),WHITE=new THREE.Color('#ffffff');
 const MOON_DIR=new THREE.Vector3(-.35,.85,.42).normalize();
 let flash=0,boltLife=0,boltPath=null,nextStrike=rand(4,9);
 export const localHour=()=>{const d=new Date();return d.getHours()+d.getMinutes()/60+d.getSeconds()/3600;};
@@ -43,10 +44,10 @@ export function updateEnvironment(dt,t){
   const fogEff=clamp(W.fog+mist*.75,0,1);
   // sky
   _c1.copy(SK.top).lerp(GREY_TOP,c*.92).multiplyScalar(1-st*.45);_c2.copy(SK.bot).lerp(GREY,c*.9).multiplyScalar(1-st*.4);
-  _c2.lerp(_c1.clone().lerp(new THREE.Color('#e6e9ef'),.5),fogEff*.4);
+  _c2.lerp(_c3.copy(_c1).lerp(HAZE,.5),fogEff*.4);
   _c1.getRGB(_rgb,THREE.SRGBColorSpace);passV.uniforms.uTop.value.set(_rgb.r,_rgb.g,_rgb.b);
   _c2.getRGB(_rgb,THREE.SRGBColorSpace);passV.uniforms.uBot.value.set(_rgb.r,_rgb.g,_rgb.b);
-  scene.fog.color.copy(_c2).lerp(new THREE.Color('#dfe4ea'),.3*SK.day);
+  scene.fog.color.copy(_c2).lerp(FOG_DAY,.3*SK.day);
   scene.fog.near=lerp(400,118,fogEff);scene.fog.far=lerp(600,215,fogEff);
   // sun / moon
   const th=(h-6)/12*Math.PI,el=Math.sin(th),sunD=_v.set(Math.cos(th)*.9,Math.max(el,.16),.45).normalize();
@@ -61,25 +62,24 @@ export function updateEnvironment(dt,t){
   // lamps (staggered on/off thresholds, a couple of flickery ones)
   for(const L of lamps){const on=light<L.th?1:0;L.level+=(on-L.level)*Math.min(1,dt*(on?.9:.6));let lv=L.level;
     if(L.flaky&&lv>.5){if(Math.random()<dt*.7)L.flick=rand(.05,.4);L.flick+=(1-L.flick)*dt*6;lv*=L.flick;}
-    L.glassMat.emissiveIntensity=lv*2.6;L.halo.material.opacity=lv*(.5+fogEff*.3);if(L.pl)L.pl.intensity=lv*13;}
+    L.glassMat.emissiveIntensity=lv*2.6;L.halo.material.opacity=lv*(.5+fogEff*.3);L.light?.set(lv*13);}
   for(const b of buildings)b.mat.emissiveIntensity=(b.shop?.3:0)+smoothstep(b.th+.15,b.th-.25,light)*b.k*1.3;
-  fountainLight.intensity=env.night*9;
+  fountainLight.set(env.night*9);lampU.uLampOn.value=env.night+lamps.reduce((s,L)=>s+L.level,0);
   // water
-  const lampCol=new THREE.Color('#ffb060').multiplyScalar(env.night*.55);
-  for(const m of waters){const u=m.uniforms;u.uTime.value=t;u.uRain.value=W.rain;u.uSky.value.copy(_c2).lerp(_c1,.4);u.uLamp.value.copy(lampCol);u.uTint.value.copy(env.tint);u.uGlow.value=env.night;}
+  for(const m of waters){const u=m.uniforms;u.uTime.value=t;u.uRain.value=W.rain;u.uSky.value.copy(_c2).lerp(_c1,.4);u.uLamp.value.copy(LAMP_GLOW).multiplyScalar(env.night*.55);u.uTint.value.copy(env.tint);u.uGlow.value=env.night;}
   puddleMat.uniforms.uOpacity.value=state.wet*.75;
   // wet ground glossiness
   groundMat.roughness=lerp(1,.3,state.wet);groundMat.color.setRGB(1-.3*state.wet,1-.28*state.wet,1-.22*state.wet);
   // ground fog
-  for(const m of fogMats){m.uniforms.uTime.value=t;m.uniforms.uAmt.value=fogEff*.6;m.uniforms.uColor.value.copy(_c2).lerp(new THREE.Color('#ffffff'),.35).multiplyScalar(.6+.4*SK.day);}
+  for(const m of fogMats){m.uniforms.uTime.value=t;m.uniforms.uAmt.value=fogEff*.6;m.uniforms.uColor.value.copy(_c2).lerp(WHITE,.35).multiplyScalar(.6+.4*SK.day);}
   // lightning
   if(W.storm>.5){nextStrike-=dt;if(nextStrike<0){strike();nextStrike=rand(5,14);}}
   flash=Math.max(0,flash-dt*3.2);
   passV.uniforms.uFlash.value=flash;passV.uniforms.uStars.value=env.night*(1-c)*.9;
   passV.uniforms.uExposure.value=lerp(1.05,.92,c);passV.uniforms.uSat.value=lerp(1.14,.74,c);
   // pixel clouds: warm-tinted by the sun, bluish at night, grey/dark with weather
-  const cu=passV.uniforms;cu.uCloud.value=W.sky;cu.uPan.value=camAz;cu.uPix.value=3*renderer.getPixelRatio();
-  _c3.set('#ffffff').lerp(SK.sun,.4*(1-c)).multiplyScalar(lerp(.1,1,SK.day)).lerp(_c4.set('#2c3366'),(1-SK.day)*.55);
+  const cu=passV.uniforms;cu.uCloud.value=W.sky;cu.uPan.value=camAz;
+  _c3.copy(WHITE).lerp(SK.sun,.4*(1-c)).multiplyScalar(lerp(.1,1,SK.day)).lerp(_c4.set('#2c3366'),(1-SK.day)*.55);
   _c3.lerp(_c4.set('#a3a8b4').multiplyScalar(lerp(.2,1,SK.day)),c*.85).multiplyScalar(1-st*.5);
   _c4.copy(_c3).multiplyScalar(.7).lerp(_c2,.3);
   _c3.getRGB(_rgb,THREE.SRGBColorSpace);cu.uCloudLit.value.set(_rgb.r,_rgb.g,_rgb.b);
