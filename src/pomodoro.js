@@ -5,9 +5,11 @@ import { sound, syncAudioUI } from './audio.js';
    13. Pomodoro suite
    ===================================================================== */
 export const pomo={dur:Object.assign({focus:25,short:5,long:15,every:4},store.get('dur',{})),mode:'focus',running:false,endAt:0,left:0,
-  autoNext:store.get('autoNext',false),dim:store.get('dim',true),count:0};
+  autoNext:store.get('autoNext',false),dim:store.get('dim',true),lock:store.get('lock',true),count:0};
 {const s=store.get('sessions',{date:'',count:0});pomo.count=s.date===new Date().toDateString()?s.count:0;}
 pomo.left=pomo.dur.focus*60000;
+// townspeople can't be picked during a running focus session; they're the break-time reward
+export const npcLocked=()=>pomo.running&&pomo.mode==='focus'&&pomo.lock;
 const MODE_LABEL={focus:'focus',short:'short break',long:'long break'},MODE_COLOR={focus:'#ffb46b',short:'#8fd6c4',long:'#9ec0ff'};
 const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 export function renderPomo(){
@@ -38,4 +40,4 @@ export function finishPomo(natural){
   setMode(next,natural&&pomo.autoNext);
 }
 setInterval(()=>{if(pomo.running&&pomo.endAt-Date.now()<=0)finishPomo(true);else renderPomo();},250);
-let toastT;function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),4200);}
+let toastT;export function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),4200);}

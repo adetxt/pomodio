@@ -5,7 +5,7 @@ import { camera, canvasEl, resize } from './renderer.js';
 import { CHANNELS, sound, syncAudioUI } from './audio.js';
 import { ROLE_MOOD, ROLE_TITLE, marker, pickables, raining } from './citizens.js';
 import { env } from './weather.js';
-import { finishPomo, pomo, renderPomo, setMode, togglePomo } from './pomodoro.js';
+import { finishPomo, npcLocked, pomo, renderPomo, setMode, toast, togglePomo } from './pomodoro.js';
 
 /* =====================================================================
    14. UI wiring
@@ -21,6 +21,7 @@ for(const [id,key,min,max] of [['dFocus','focus',1,180],['dShort','short',1,60],
 }
 $('pAutoNext').checked=pomo.autoNext;$('pAutoNext').onchange=e=>{pomo.autoNext=e.target.checked;store.set('autoNext',pomo.autoNext);};
 $('pDim').checked=pomo.dim;$('pDim').onchange=e=>{pomo.dim=e.target.checked;store.set('dim',pomo.dim);renderPomo();};
+$('pLock').checked=pomo.lock;$('pLock').onchange=e=>{pomo.lock=e.target.checked;store.set('lock',pomo.lock);};
 // time of day
 export const tod=$('tod');
 function setLive(v){state.live=v;$('liveBtn').classList.toggle('on',v);}
@@ -67,6 +68,7 @@ canvasEl.addEventListener('pointerup',e=>{
   if(!downAt||Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1])>5)return;
   ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(ndc,camera);
   const hit=ray.intersectObjects(pickables.filter(p=>p.parent.visible),false)[0];
+  if(npcLocked()){if(hit)toast('Townspeople are busy until your break 🌿');return;}
   if(hit){selected=hit.object.userData.agent;$('card').hidden=false;updateCard();
     if(selected.kind==='cat'){sound.meow();selected.say(pick(['💕','😼','🐾']),1.5);}else selected.say(pick(['💬','♪','🌸']),1.5);}else closeCard();
 });
@@ -86,7 +88,7 @@ function moodOf(a){
 }
 const portrait=$('cardPortrait').getContext('2d');
 export function updateCard(){
-  const a=selected;if(!a)return;
+  const a=selected;if(!a)return;if(npcLocked())return closeCard();
   $('cardName').textContent=a.name;$('cardRole').textContent=ROLE_TITLE[a.role]||a.role;$('cardAct').textContent=a.label;$('cardMood').textContent=moodOf(a);
   const pet=a.kind==='dog'||a.kind==='cat';$('cardTrack').textContent=pet?`${a.track} (allegedly)`:a.track;$('cardSteps').textContent=Math.floor(a.steps).toLocaleString()+(pet?' paw-steps':'');
   $('cardEnergy').style.width=Math.round(clamp(a.energy-(a.steps-5000)/60000,.1,1)*100)+'%';
