@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { TAU, clamp, pick, pixTex, rand, randInt } from './utils.js';
+import { state } from './state.js';
+import { pedestrianDestination, presenceFor } from './activity.js';
+import { advanceFishing, createFishing, resetFishing } from './fishing.js';
 import { camAz, camRight, scene } from './renderer.js';
 import { COURT, GW, GX0 } from './ground.js';
 import { BUS_STOPS, PARK_TREES, SHELTERS, STALLS, canalSeats, fountainSeats, groundY, southSeats, staticBillboards } from './city.js';
@@ -37,7 +40,7 @@ class Agent{
       queue:[],cur:null,anim:'idle',facing:1,animT:rand(0,10),frame:0,steps:randInt(1400,9000),label:'Enjoying the park',
       track:`“${pick(TRACKS)}” — ${pick(ARTISTS)}`,energy:rand(.45,.95),sheltered:false,spot:null,atHome:false,bubbleT:0,bubbleDur:0,sipT:rand(2,6),sip:false});
     this.tex=pixTex(this.sheet.canvas);this.tex.repeat.set(1/this.sheet.frames,1);
-    this.mat=new THREE.MeshBasicMaterial({map:this.tex,alphaTest:.5,side:THREE.DoubleSide});spriteMats.push(this.mat);
+    this.mat=new THREE.MeshBasicMaterial({map:this.tex,alphaTest:.05,transparent:true,side:THREE.DoubleSide});spriteMats.push(this.mat);
     this.group=new THREE.Group();scene.add(this.group);
     this.sprite=new THREE.Mesh(this.kind==='cat'?GEO.cat:this.kind==='dog'?GEO.dog:this.kind==='cyclist'?GEO.bike:GEO.person,this.mat);this.sprite.rotation.order='YXZ';
     this.sprite.userData.agent=this;this.group.add(this.sprite);pickables.push(this.sprite);
@@ -45,7 +48,7 @@ class Agent{
     if(this.kind==='cyclist')this.blob.scale.set(2.2,1,.9);if(this.kind==='dog')this.blob.scale.set(1.3,1,.7);if(this.kind==='cat')this.blob.scale.set(1,1,.55);this.group.add(this.blob);
     this.bubbleMat=new THREE.MeshBasicMaterial({transparent:true,depthWrite:false,fog:false});
     this.bubble=new THREE.Mesh(GEO.bubble,this.bubbleMat);this.bubble.visible=false;this.bubble.renderOrder=8;this.group.add(this.bubble);
-    if(this.umbrellaOK){this.umb=new THREE.Mesh(GEO.umbrella,new THREE.MeshBasicMaterial({map:pick(UMBRELLAS),alphaTest:.5,side:THREE.DoubleSide}));
+    if(this.umbrellaOK){this.umb=new THREE.Mesh(GEO.umbrella,new THREE.MeshBasicMaterial({map:pick(UMBRELLAS),alphaTest:.05,transparent:true,side:THREE.DoubleSide}));
       spriteMats.push(this.umb.material);this.umb.rotation.order='YXZ';this.umb.visible=false;this.umb.position.y=.62;this.umbS=0;this.group.add(this.umb);}
     agents.push(this);
   }
@@ -71,7 +74,29 @@ class Agent{
   }
   think(){BRAINS[this.role]?.(this);}
   update(dt){
+    // Stable ranks give every resident their own arrival/departure time. Dogs
+    // share their owner's presence, so neither a dog nor its leash is orphaned.
+    let target=this.owner?this.owner.presence:presenceFor(this.role,state.hour,this.scheduleRank??.5);
+    // A clock change can wake someone who faded out midway across the avenue.
+    // Let the bus pass before bringing that resident back into the roadway.
+    if(this.presence<=.02&&this.z>=-15.35&&this.z<=-10.65&&!crossingClear(this.x))target=0;
+    this.presence=this.owner||this.presence===undefined?target:this.presence+(target-this.presence)*Math.min(1,dt*2);
+    this.group.visible=this.presence>.02;
+    this.mat.opacity=this.presence;this.bubbleMat.opacity=this.presence;
+    if(this.umb)this.umb.material.opacity=this.presence;
+    this.blob.visible=this.presence>.5;
+    if(this.leash){this.leash.visible=this.group.visible&&this.owner.group.visible;this.leash.material.opacity=this.presence;}
+    if(!this.group.visible){
+      if(this.shelterSeeker){
+        if(this.spot||this.sheltered)releaseShelter(this);
+        this.queue.length=0;this.cur=null;
+      }
+      this.bubble.visible=false;
+      if(this.rod){if(this.rod.g.visible)resetFishing(this.rod.fishing);this.rod.g.visible=false;}
+      return;
+    }
     if(this.custom)this.custom(dt);else this.runQueue(dt);
+    if(this.kind==='cyclist')this.group.visible=this.presence>.02&&Math.abs(this.x)<GW/2+.2;
     this.animate(dt);
     if(this.bubble.visible){this.bubbleT+=dt;const t=this.bubbleT,sc=t<.25?1.1*Math.sin(t/.25*Math.PI/2):t>this.bubbleDur-.2?Math.max(.01,(this.bubbleDur-t)/.2):1;
       this.bubble.scale.setScalar(sc);if(t>this.bubbleDur)this.bubble.visible=false;}
@@ -154,12 +179,13 @@ const BRAINS={
     if(raining){if(a.sheltered)a.queue.push({t:'wait',dur:rand(6,14),anim:'sit',label:'Glaring at the rain from cover',bubbles:['💢','💤','🐾']});else goShelter(a);return;}
     if(a.spot||a.sheltered)releaseShelter(a);
     const h=a.home;
+    const nocturnal=state.hour<6||state.hour>=20;
     if(!a.atHome){a.queue.push(...routeSteps(a,h.x,h.z,{speed:rand(.7,.9),label:'Trotting back to its favourite spot'}));a.queue.push({t:'fn',fn:()=>{a.atHome=true;}});return;}
-    if(h.wander&&Math.random()<.45){const p=catWanderTarget(h);
-      a.queue.push({t:'move',x:p.x,z:p.z,speed:rand(.55,.85),anim:'walk',label:pick(['Prowling around','Investigating a leaf','Patrolling the territory','Stalking a petal'])});
+    if(h.wander&&Math.random()<(nocturnal?.85:.45)){const p=catWanderTarget(h);
+      a.queue.push({t:'move',x:p.x,z:p.z,speed:rand(.55,.85),anim:'walk',label:nocturnal?'Patrolling the quiet streets':pick(['Prowling around','Investigating a leaf','Patrolling the territory','Stalking a petal'])});
       a.queue.push({t:'wait',dur:rand(3,8),anim:pick(['sit','groom']),label:pick(['Grooming a paw','Sitting like a loaf of bread','Judging passers-by']),bubbles:['🐾','💕','😼']});
       a.queue.push({t:'move',x:h.x,z:h.z,speed:rand(.55,.85),anim:'walk',label:'Strolling back to its favourite spot'});return;}
-    a.queue.push({t:'wait',dur:rand(10,30),anim:h.pose,y:h.y,faceX:h.fx,faceZ:h.fz,label:pick(h.labels),bubbles:h.bubbles});
+    a.queue.push({t:'wait',dur:nocturnal?rand(3,8):rand(10,30),anim:nocturnal?'sit':h.pose,y:h.y,faceX:h.fx,faceZ:h.fz,label:nocturnal?'Listening for tiny nighttime footsteps':pick(h.labels),bubbles:nocturnal?['👀','🐾']:h.bubbles});
   },
   patron(a){const h=a.home;a.queue.push({t:'wait',dur:rand(15,40),anim:'sit',y:h.y,faceX:h.fx,faceZ:h.fz,label:pick(h.labels),bubbles:h.bubbles});},
   walker(a){const p=lawnTarget(a.x,a.z),dn=a.dog.name;
@@ -167,13 +193,19 @@ const BRAINS={
     a.queue.push({t:'wait',dur:rand(2,5),anim:'idle',label:pick([`Letting ${dn} sniff the flowers`,`Throwing a stick for ${dn}`,'Chatting with a fellow dog owner']),
       bubbles:['🐕','🌸','💬'],bubble:Math.random()<.4?'🐕':undefined});},
   pedestrian(a){
-    const n=NODES[a.node];let opts=n.adj.filter(e=>e.to!==a.prev);if(!opts.length)opts=n.adj;
-    // prefer staying out of the inner park ring a bit so streets stay lively
-    const e=pick(opts),nx=NODES[e.to],sp=raining?rand(1.25,1.45):rand(.95,1.2);
+    const n=NODES[a.node],period=Math.floor(state.hour/3);
+    if(!a.destination||a.destination===a.node||a.tripPeriod!==period){
+      const area=pedestrianDestination(state.hour,Math.random());
+      const destinations=Object.values(NODES).filter(p=>p.area===area&&p.id!==a.node);
+      a.destination=destinations.length?pick(destinations).id:pick(n.adj).to;a.tripPeriod=period;
+    }
+    const path=dijkstra(a.node,a.destination),e=n.adj.find(e=>e.to===path[1])||pick(n.adj);
+    const nx=NODES[e.to],sp=raining?rand(1.25,1.45):rand(.95,1.2);
     const area={walk:'Strolling along the park',avenue:'Window shopping on the avenue',cafe:'Passing the café',bus:'Walking by the bus stop',
       prom:'Walking along the canal',plaza:'Crossing the plaza',market:'Browsing the market stalls',garden:'Wandering through the community garden',bridge:'Crossing the canal bridge',south:'Strolling the south bank',park:'Wandering the gravel paths',fountain:'Circling the fountain'}[nx.area];
     if(e.cross)a.queue.push({t:'wait',dur:rand(1,2.4),anim:'idle',label:'Looking both ways at the crossing',crossX:nx.x});
-    a.queue.push({t:'move',x:nx.x+rand(-.25,.25),z:nx.z+rand(-.25,.25),speed:sp,anim:'walk',label:e.cross?'Crossing the street':area});
+    const late=state.hour<5.5||state.hour>=22;
+    a.queue.push({t:'move',x:nx.x+rand(-.25,.25),z:nx.z+rand(-.25,.25),speed:sp,anim:'walk',label:e.cross?'Crossing the street':late?'Making their way home through the quiet town':state.hour<10&&NODES[a.destination].area==='bus'?'Heading to the bus for the morning commute':area});
     a.queue.push({t:'fn',fn:()=>{a.prev=a.node;a.node=e.to;}});
     const r=Math.random();
     if(nx.area==='fountain'&&r<.3)a.queue.push({t:'wait',dur:rand(3,6),anim:'idle',label:'Admiring the fountain',faceX:0,faceZ:0,bubble:pick(['🌸','✨','💬'])});
@@ -253,7 +285,7 @@ for(let i=0;i<2;i++){
     else{this.idleT+=dt;this.anim=this.idleT>2.5?'sit':'idle';}
     this.label=moving?`Trotting happily beside ${o.name}`:this.anim==='sit'?`Sitting politely for ${o.name}`:'Sniffing every single blade of grass';
     if(!this.bubble.visible&&Math.random()<dt*.04)this.say(pick(['🐕','🦴','💕']));};
-  const leash=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:'#3a2a30'}));
+  const leash=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:'#3a2a30',transparent:true}));
   leash.frustumCulled=false;scene.add(leash);d.leash=leash;
 }
 // pedestrians
@@ -261,6 +293,8 @@ for(const s of [southSeats[1],southSeats[4]])homeAgent('canal',s,{place:'the sou
 // anglers sitting on the south quay wall, rods out over the canal
 const rodMat=new THREE.MeshStandardMaterial({color:'#6b4a2e',roughness:.8}),bobberMat=new THREE.MeshStandardMaterial({color:'#e2452f',roughness:.5});
 const lineMat=new THREE.LineBasicMaterial({color:'#e8e4da',transparent:true,opacity:.75});
+const fishMat=new THREE.MeshStandardMaterial({color:'#a8cfbd',roughness:.5}),finMat=new THREE.MeshStandardMaterial({color:'#5b9389'});
+const eyeMat=new THREE.MeshBasicMaterial({color:'#1e2832'});
 const ROD_BUTT=new THREE.Vector3(0,.55,-.05),ROD_TIP=new THREE.Vector3(0,1.75,-1.9);
 for(const x of [-26,-12.5,16.5]){
   const a=homeAgent('fisher',{x,z:14.45,fx:x,fz:10},{y:.12,place:'the quay',labels:['Waiting for a bite','Watching the bobber','Re-baiting the hook','Telling the one about the giant carp'],bubbles:['🎣','🐟','💤','♪']});
@@ -269,17 +303,50 @@ for(const x of [-26,-12.5,16.5]){
   rod.position.copy(ROD_BUTT);rod.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());rod.castShadow=true;g.add(rod);
   const bob=new THREE.Mesh(new THREE.SphereGeometry(.07,6,4),bobberMat);g.add(bob);
   const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([ROD_TIP,new THREE.Vector3()]),lineMat);line.frustumCulled=false;g.add(line);
-  a.group.add(g);a.rod={g,bob,line,bite:0,t:rand(0,TAU)};
+  // A chunky little fish actually leaves the water and dangles from the line.
+  const fish=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(.2,.36,.12),fishMat);fish.add(body);
+  const tail=new THREE.Mesh(new THREE.BoxGeometry(.3,.13,.1),finMat);tail.position.y=-.22;fish.add(tail);
+  for(const z of [-.065,.065]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.045,.045,.015),eyeMat);eye.position.set(.055,.1,z);fish.add(eye);}
+  fish.visible=false;g.add(fish);
+  const ripple=new THREE.Mesh(new THREE.RingGeometry(.16,.2,16),new THREE.MeshBasicMaterial({color:'#e3f5ea',transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
+  ripple.rotation.x=-Math.PI/2;g.add(ripple);
+  a.group.add(g);a.rod={g,mesh:rod,restAngle:rod.rotation.x,bob,line,fish,ripple,fishing:createFishing(),t:rand(0,TAU)};
 }
+const rodTip=new THREE.Vector3(),rodAxis=new THREE.Vector3(1,0,0);
 function updateRod(a,dt){
-  const r=a.rod;r.g.visible=a.atHome&&a.anim==='sit';if(!r.g.visible)return;
-  const was=r.bite;r.t+=dt;r.bite-=dt;
-  if(r.bite<=-1&&Math.random()<dt*.05)r.bite=1.2; // a nibble: the bobber dips and the rod twitches
-  if(was>0&&r.bite<=0&&Math.random()<.5)a.say('🐟',1.8);
-  const nib=r.bite>0?Math.sin(r.bite*18)*.5+.5:0;
-  r.bob.position.set(0,.05-a.group.position.y+Math.sin(r.t*1.8)*.015-nib*.08,-2.2); // canal surface sits at y≈.04
-  r.g.rotation.x=nib*.04;
-  const p=r.line.geometry.attributes.position;p.setXYZ(1,r.bob.position.x,r.bob.position.y+.05,r.bob.position.z);p.needsUpdate=true;
+  const r=a.rod;r.g.visible=a.atHome&&!a.sheltered&&!raining&&a.anim==='sit'&&a.presence>.5;
+  if(!r.g.visible){
+    // Leaving for shelter cancels the cast; returning starts at the water.
+    if(r.fishing.phase!=='waiting'||r.fishing.elapsed>0)resetFishing(r.fishing);return;
+  }
+  const f=r.fishing,was=f.phase;r.t+=dt;advanceFishing(f,dt);
+  if(f.phase!==was){
+    if(f.phase==='bite')a.say('!',1.2);
+    if(f.phase==='caught')a.say('🐟',3);
+    if(was==='bite'&&f.phase==='waiting')a.say('💦',1.6);
+  }
+  const t=f.elapsed/f.duration,nib=f.phase==='bite'?(Math.sin(r.t*20)*.5+.5):0;
+  // Keep rod, line and water props in the same unrotated space; only the
+  // rod mesh tilts so its bobber never floats above the canal when it twitches.
+  const lift=f.phase==='reel'?Math.sin(t*Math.PI/2)*.5:f.phase==='caught'?.5:0;
+  r.mesh.rotation.x=r.restAngle+lift+nib*.035;
+  const surface=.05-a.group.position.y;
+  r.bob.visible=f.phase==='waiting'||f.phase==='bite';
+  r.bob.position.set(0,surface+Math.sin(r.t*1.8)*.015-nib*.09,-2.2);
+  r.fish.visible=f.phase==='reel'||f.phase==='caught';
+  const reel=f.phase==='caught'?1:t;
+  // Lift the catch beside the angler's silhouette, so it remains visible
+  // from either camera orbit instead of disappearing behind their sprite.
+  r.fish.position.set(camRight.x*reel*.7+Math.sin(r.t*13)*.06,surface+reel*1.4,-2.2+reel*1.25+camRight.z*reel*.7);
+  r.fish.rotation.z=Math.sin(r.t*18)*.28;
+  r.ripple.position.set(0,surface+.01,-2.2);
+  r.ripple.scale.setScalar(.8+(r.t*2%1)*2);
+  r.ripple.material.opacity=(f.phase==='bite'?.55:f.phase==='reel'&&t<.4?.4:0)*(1-r.t*2%1);
+  const tip=rodTip.copy(ROD_TIP).sub(ROD_BUTT).applyAxisAngle(rodAxis,lift+nib*.035).add(ROD_BUTT);
+  const end=r.fish.visible?r.fish.position:r.bob.position,p=r.line.geometry.attributes.position;
+  p.setXYZ(0,tip.x,tip.y,tip.z);p.setXYZ(1,end.x,end.y+(r.fish.visible?.18:.04),end.z);p.needsUpdate=true;
+  a.label=f.phase==='bite'?'A bite! Getting ready to reel in':f.phase==='reel'?'Reeling in a wriggling fish!':f.phase==='caught'?`Landed a fish! ${f.catches} caught today`:`Watching the bobber · ${f.catches} fish caught`;
 }
 homeAgent('picnic',{x:-14.5,z:21.3,fx:-11,fz:21.3},{y:-.06,place:'the riverside picnic',item:'cup',labels:['Picnicking by the river','Sharing a thermos of tea'],bubbles:['☕','🌸','💬']});
 homeAgent('picnic',{x:-13.5,z:21.4,fx:-17,fz:21.3},{y:-.06,place:'the riverside picnic',item:'book',labels:['Reading aloud on a blanket','Napping in the sun'],bubbles:['📖','💤','🌸']});
@@ -318,6 +385,12 @@ CAT_COATS.forEach((coat,i)=>{
 });
 const PED_START=['S2','F3','F7','P3','P5','E2','W2','R2','S4','F5','Fb','M2','G2','SB2','SB4','Pa','Se','BR'];
 PED_START.forEach((id,i)=>{const a=makePerson('pedestrian',{},{umbrella:true});const n=NODES[id];a.node=id;a.setXZ(n.x,n.z);if(i%3===0)a.queue.push({t:'wait',dur:rand(0,3),anim:'idle'});});
+// Evenly spaced within each role: a small cast still gets a useful range of
+// schedules, without all three anglers or all café patrons leaving together.
+for(const role of new Set(agents.map(a=>a.role))){
+  const cast=agents.filter(a=>a.role===role);
+  cast.forEach((a,i)=>{a.scheduleRank=(i+.5)/cast.length;});
+}
 // selection marker
 export const marker=new THREE.Mesh(GEO.marker,new THREE.MeshBasicMaterial({map:markerTex,alphaTest:.5,side:THREE.DoubleSide,fog:false}));marker.visible=false;scene.add(marker);
 // parked bikes (static billboards)

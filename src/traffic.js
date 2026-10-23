@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { rand } from './utils.js';
+import { state } from './state.js';
+import { busHeadway } from './activity.js';
 import { renderer, scene } from './renderer.js';
 import { GW, GX0 } from './ground.js';
 import { BUS_STOPS, buildings } from './city.js';
@@ -39,13 +41,20 @@ const wheel=new THREE.CylinderGeometry(.36,.36,.28,10).rotateX(Math.PI/2);
 for(const x of [-L/2+1.1,L/2-1.25])for(const z of [-1,1])part(wheel,tyre,x,.36,z*(WD/2-.1));
 scene.add(bus);
 
-const car={len:L,x:0};vehicles.push(car);
-let leg=0,x=-EDGE,v=VMAX,dwell=0,served=false,away=0;
-function placeBus(){const g=LEGS[leg];bus.position.set(x,0,g.z);bus.rotation.y=g.dir>0?0:Math.PI;car.x=x;}
+const car={len:L,x:-EDGE,active:false};vehicles.push(car);
+let leg=0,x=-EDGE,v=VMAX,dwell=0,served=false,away=0,waiting=true,initialized=false,headwayVariation=1;
+function placeBus(){const g=LEGS[leg];bus.position.set(x,0,g.z);bus.rotation.y=g.dir>0?0:Math.PI;car.x=x;car.active=!waiting;bus.visible=!waiting;}
 placeBus();
 export function updateTraffic(dt){
+  if(!initialized){initialized=true;away=busHeadway(state.hour)>90?0:.9;}
+  if(waiting){
+    // Accumulate service progress so moving the time slider immediately
+    // adjusts frequency; an old daytime timeout cannot trigger a night bus.
+    away+=dt/(busHeadway(state.hour)*headwayVariation);
+    if(away<1)return;
+    waiting=false;away=0;x=-LEGS[leg].dir*EDGE;v=VMAX;served=false;placeBus();
+  }
   const g=LEGS[leg],d=g.dir;
-  if(away>0){away-=dt;if(away<=0){leg=1-leg;x=-LEGS[leg].dir*EDGE;v=VMAX;served=false;placeBus();}return;}
   if(dwell>0){dwell-=dt;return;}
   let vt=VMAX;
   // ease into the stop so the door lines up with the shelter
@@ -54,9 +63,9 @@ export function updateTraffic(dt){
     vt=Math.min(vt,Math.sqrt(2*DEC*Math.max(0,ds)));}
   // give way to anyone on the road ahead (pedestrians on a crossing, a cat dashing across)
   const front=x+d*L/2;
-  for(const a of agents){if(a.z<ROAD.z0||a.z>ROAD.z1)continue;const ahead=(a.x-front)*d;
+  for(const a of agents){if(!a.group.visible||a.z<ROAD.z0||a.z>ROAD.z1)continue;const ahead=(a.x-front)*d;
     if(ahead>-.6&&ahead<8)vt=Math.min(vt,Math.sqrt(2*DEC*Math.max(0,ahead-1.2)));}
   v=Math.min(vt,v+ACC*dt);x+=d*v*dt;
-  if(x*d>EDGE)away=rand(6,14);
+  if(x*d>EDGE){waiting=true;away=0;leg=1-leg;headwayVariation=rand(.85,1.15);}
   placeBus();
 }
