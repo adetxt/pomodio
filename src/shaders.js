@@ -46,7 +46,7 @@ for(const [y,k] of [[.35,1],[.95,.8],[1.7,.55]]){
   const p=new THREE.Mesh(new THREE.PlaneGeometry(GW,GD).rotateX(-Math.PI/2),m);p.position.set(0,y,GZ0+GD/2);p.renderOrder=5;scene.add(p);fogMats.push(m);
 }
 const PT_VS=`attribute vec3 aColor;attribute float aSize;attribute float aAlpha;varying vec3 vC;varying float vA;uniform float uScale;
-void main(){vC=aColor;vA=aAlpha;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_PointSize=max(1.,aSize*uScale);}`;
+void main(){vC=aColor;vA=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;gl_PointSize=max(1.,aSize*uScale/-mv.z);}`;
 const PT_FS=`uniform float uSoft,uTintAmt;uniform vec3 uTint;varying vec3 vC;varying float vA;
 void main(){float d=length(gl_PointCoord-.5);float a=uSoft>.5?smoothstep(.5,.05,d):1.;a*=vA;if(a<.01)discard;
   gl_FragColor=vec4(vC*mix(vec3(1.),uTint,uTintAmt),a);}`;

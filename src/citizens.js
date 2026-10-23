@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { TAU, clamp, pick, pixTex, rand, randInt } from './utils.js';
 import { camAz, camRight, scene } from './renderer.js';
 import { COURT, GW, GX0 } from './ground.js';
-import { PARK_TREES, SHELTERS, STALLS, canalSeats, fountainSeats, groundY, southSeats, staticBillboards } from './city.js';
-import { LOOP_LEN, NODES, dijkstra, isCross, loopAt, nearestNode } from './nav.js';
+import { BUS_STOPS, PARK_TREES, SHELTERS, STALLS, canalSeats, fountainSeats, groundY, southSeats, staticBillboards } from './city.js';
+import { LOOP_LEN, NODES, crossingClear, dijkstra, isCross, loopAt, nearestNode } from './nav.js';
 import { PX, UMBRELLAS, bikeSheet, bubbleTex, catSheet, dogSheet, markerTex, personParams, personSheet } from './sprites.js';
 import { sound } from './audio.js';
 
@@ -18,9 +18,9 @@ const TRACKS=['rainy window study','matcha at 3am','sunday laundromat','tape dec
   'headphones in the park','vinyl & velvet','amber hour'];
 const ARTISTS=['tape owl','sleepy kettle','moss & mono','lofi lantern','quiet tram','cassette fox','velvet hum','paper moon club'];
 export const ROLE_TITLE={cat:'Neighbourhood Cat',shopper:'Market Shopper',gardener:'Community Gardener',player:'Hoop Dreamer',jogger:'Jogger',cyclist:'Cyclist',reader:'Bench Reader',rester:'Shade Napper',picnic:'Picnicker',walker:'Dog Walker',dog:'Very Good Dog',
-  pedestrian:'Pedestrian',patron:'Café Regular',chatter:'Neighbour',canal:'Canal Watcher'};
+  pedestrian:'Pedestrian',patron:'Café Regular',chatter:'Neighbour',canal:'Canal Watcher',fisher:'Angler'};
 export const ROLE_MOOD={cat:'😼 Smug',shopper:'🍎 Peckish',gardener:'🌱 Grounded',player:'🏀 Competitive',jogger:'⚡ Energized',cyclist:'🚲 Breezy',reader:'📖 Absorbed',rester:'😌 Serene',picnic:'🌸 Content',walker:'🐕 Cheerful',dog:'🦴 Ecstatic',
-  pedestrian:'🙂 Easygoing',patron:'☕ Caffeinated',chatter:'💬 Chatty',canal:'🌊 Pensive'};
+  pedestrian:'🙂 Easygoing',patron:'☕ Caffeinated',chatter:'💬 Chatty',canal:'🌊 Pensive',fisher:'🎣 Patient'};
 const usedNames=new Set();
 function uniqueName(list){for(let i=0;i<20;i++){const n=pick(list);if(!usedNames.has(n)){usedNames.add(n);return n;}}return pick(list);}
 const GEO={person:planeGeo(16*PX,24*PX),bike:planeGeo(24*PX,24*PX),dog:planeGeo(16*PX,12*PX),umbrella:planeGeo(24*PX,18*PX),cat:planeGeo(16*PX*.85,12*PX*.85),bubble:planeGeo(.72,.72),marker:planeGeo(.42,.34)};
@@ -66,7 +66,7 @@ class Agent{
     const s=this.cur;
     if(s.t==='move'){const dx=s.x-this.x,dz=s.z-this.z,d=Math.hypot(dx,dz),sp=s.speed*dt;
       if(d<=sp){this.setXZ(s.x,s.z);this.addSteps(d);this.cur=null;}else{this.setXZ(this.x+dx/d*sp,this.z+dz/d*sp);this.addSteps(sp);this.faceDir(dx,dz);}this.group.position.y=groundY(this.x,this.z);}
-    else if(s.t==='wait'){s.dur-=dt;if(s.bubbles&&!this.bubble.visible&&Math.random()<dt*.09)this.say(pick(s.bubbles));if(s.dur<=0)this.cur=null;}
+    else if(s.t==='wait'){s.dur-=dt;if(s.bubbles&&!this.bubble.visible&&Math.random()<dt*.09)this.say(pick(s.bubbles));if(s.dur<=0&&(s.crossX===undefined||crossingClear(s.crossX)))this.cur=null;}
     else if(s.t==='fn'){this.cur=null;s.fn();}
   }
   think(){BRAINS[this.role]?.(this);}
@@ -77,6 +77,7 @@ class Agent{
       this.bubble.scale.setScalar(sc);if(t>this.bubbleDur)this.bubble.visible=false;}
     if(this.umb){const want=raining&&!this.sheltered&&this.anim!=='sit';this.umbS=clamp(this.umbS+(want?dt*5:-dt*5),0,1);
       this.umb.visible=this.umbS>0;this.umb.scale.set(this.umbS,this.umbS,1);}
+    if(this.rod)updateRod(this,dt);
     this.blob.position.y=-this.group.position.y+.015;
   }
   animate(dt){
@@ -107,7 +108,7 @@ function routeSteps(a,tx,tz,o={}){
   if(Math.hypot(tx-a.x,tz-a.z)<2.2){steps.push({t:'move',x:tx,z:tz,speed,anim,label});return steps;}
   const from=nearestNode(a.x,a.z),to=nearestNode(tx,tz),ids=from===to?[from]:dijkstra(from,to);
   ids.forEach((id,i)=>{const n=NODES[id];
-    if(i>0&&isCross(ids[i-1],id)){if(!o.hurry)steps.push({t:'wait',dur:rand(1,2.2),anim:'idle',label:'Looking both ways at the crossing'});
+    if(i>0&&isCross(ids[i-1],id)){steps.push({t:'wait',dur:o.hurry?0:rand(1,2.2),anim:'idle',label:'Looking both ways at the crossing',crossX:n.x});
       steps.push({t:'move',x:n.x+rand(-.3,.3),z:n.z,speed:speed*1.1,anim,label:o.hurry?label:'Crossing the street'});}
     else steps.push({t:'move',x:n.x+rand(-.2,.2),z:n.z+rand(-.2,.2),speed,anim,label});});
   steps.push({t:'move',x:tx,z:tz,speed,anim,label});
@@ -148,7 +149,7 @@ function homeBrain(a){
   a.queue.push({t:'wait',dur:rand(15,40),anim:h.pose,y:h.y,faceX:h.fx,faceZ:h.fz,label:pick(h.labels),bubbles:h.bubbles});
 }
 const BRAINS={
-  reader:homeBrain,rester:homeBrain,picnic:homeBrain,chatter:homeBrain,canal:homeBrain,shopper:homeBrain,gardener:homeBrain,player:homeBrain,
+  reader:homeBrain,rester:homeBrain,picnic:homeBrain,chatter:homeBrain,canal:homeBrain,fisher:homeBrain,shopper:homeBrain,gardener:homeBrain,player:homeBrain,
   cat(a){
     if(raining){if(a.sheltered)a.queue.push({t:'wait',dur:rand(6,14),anim:'sit',label:'Glaring at the rain from cover',bubbles:['💢','💤','🐾']});else goShelter(a);return;}
     if(a.spot||a.sheltered)releaseShelter(a);
@@ -171,13 +172,13 @@ const BRAINS={
     const e=pick(opts),nx=NODES[e.to],sp=raining?rand(1.25,1.45):rand(.95,1.2);
     const area={walk:'Strolling along the park',avenue:'Window shopping on the avenue',cafe:'Passing the café',bus:'Walking by the bus stop',
       prom:'Walking along the canal',plaza:'Crossing the plaza',market:'Browsing the market stalls',garden:'Wandering through the community garden',bridge:'Crossing the canal bridge',south:'Strolling the south bank',park:'Wandering the gravel paths',fountain:'Circling the fountain'}[nx.area];
-    if(e.cross)a.queue.push({t:'wait',dur:rand(1,2.4),anim:'idle',label:'Looking both ways at the crossing'});
+    if(e.cross)a.queue.push({t:'wait',dur:rand(1,2.4),anim:'idle',label:'Looking both ways at the crossing',crossX:nx.x});
     a.queue.push({t:'move',x:nx.x+rand(-.25,.25),z:nx.z+rand(-.25,.25),speed:sp,anim:'walk',label:e.cross?'Crossing the street':area});
     a.queue.push({t:'fn',fn:()=>{a.prev=a.node;a.node=e.to;}});
     const r=Math.random();
     if(nx.area==='fountain'&&r<.3)a.queue.push({t:'wait',dur:rand(3,6),anim:'idle',label:'Admiring the fountain',faceX:0,faceZ:0,bubble:pick(['🌸','✨','💬'])});
     else if(nx.area==='cafe'&&r<.35)a.queue.push({t:'wait',dur:rand(3,5),anim:'idle',label:'Reading the café chalkboard',faceX:10,faceZ:-21,bubble:'☕'});
-    else if(nx.area==='bus'&&r<.3)a.queue.push({t:'wait',dur:rand(3,6),anim:'idle',label:'Checking the bus timetable',faceX:15.2,faceZ:-9.3});
+    else if(nx.area==='bus'&&r<.3){const st=BUS_STOPS.find(b=>b.node===nx.id);a.queue.push({t:'wait',dur:rand(3,6),anim:'idle',label:'Checking the bus timetable',faceX:st.poleX,faceZ:st.poleZ});}
     else if(nx.area==='prom'&&r<.2)a.queue.push({t:'wait',dur:rand(3,6),anim:'idle',label:'Watching ripples on the canal',faceX:nx.x,faceZ:13,bubble:'♪'});
     else if(r<.05&&!raining)a.queue.push({t:'wait',dur:rand(2,4),anim:'idle',label:'Humming along to their headphones',bubble:'♪'});
   },
@@ -257,6 +258,29 @@ for(let i=0;i<2;i++){
 }
 // pedestrians
 for(const s of [southSeats[1],southSeats[4]])homeAgent('canal',s,{place:'the south bank bench',item:Math.random()<.5?'book':'cup',labels:['Watching boats drift by','Reading by the water','Counting ripples'],bubbles:['♪','📖','🌸']});
+// anglers sitting on the south quay wall, rods out over the canal
+const rodMat=new THREE.MeshStandardMaterial({color:'#6b4a2e',roughness:.8}),bobberMat=new THREE.MeshStandardMaterial({color:'#e2452f',roughness:.5});
+const lineMat=new THREE.LineBasicMaterial({color:'#e8e4da',transparent:true,opacity:.75});
+const ROD_BUTT=new THREE.Vector3(0,.55,-.05),ROD_TIP=new THREE.Vector3(0,1.75,-1.9);
+for(const x of [-26,-12.5,16.5]){
+  const a=homeAgent('fisher',{x,z:14.45,fx:x,fz:10},{y:.12,place:'the quay',labels:['Waiting for a bite','Watching the bobber','Re-baiting the hook','Telling the one about the giant carp'],bubbles:['🎣','🐟','💤','♪']});
+  const g=new THREE.Group(),dir=ROD_TIP.clone().sub(ROD_BUTT);
+  const rod=new THREE.Mesh(new THREE.CylinderGeometry(.015,.03,dir.length(),5).translate(0,dir.length()/2,0),rodMat);
+  rod.position.copy(ROD_BUTT);rod.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());rod.castShadow=true;g.add(rod);
+  const bob=new THREE.Mesh(new THREE.SphereGeometry(.07,6,4),bobberMat);g.add(bob);
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([ROD_TIP,new THREE.Vector3()]),lineMat);line.frustumCulled=false;g.add(line);
+  a.group.add(g);a.rod={g,bob,line,bite:0,t:rand(0,TAU)};
+}
+function updateRod(a,dt){
+  const r=a.rod;r.g.visible=a.atHome&&a.anim==='sit';if(!r.g.visible)return;
+  const was=r.bite;r.t+=dt;r.bite-=dt;
+  if(r.bite<=-1&&Math.random()<dt*.05)r.bite=1.2; // a nibble: the bobber dips and the rod twitches
+  if(was>0&&r.bite<=0&&Math.random()<.5)a.say('🐟',1.8);
+  const nib=r.bite>0?Math.sin(r.bite*18)*.5+.5:0;
+  r.bob.position.set(0,.05-a.group.position.y+Math.sin(r.t*1.8)*.015-nib*.08,-2.2); // canal surface sits at y≈.04
+  r.g.rotation.x=nib*.04;
+  const p=r.line.geometry.attributes.position;p.setXYZ(1,r.bob.position.x,r.bob.position.y+.05,r.bob.position.z);p.needsUpdate=true;
+}
 homeAgent('picnic',{x:-14.5,z:21.3,fx:-11,fz:21.3},{y:-.06,place:'the riverside picnic',item:'cup',labels:['Picnicking by the river','Sharing a thermos of tea'],bubbles:['☕','🌸','💬']});
 homeAgent('picnic',{x:-13.5,z:21.4,fx:-17,fz:21.3},{y:-.06,place:'the riverside picnic',item:'book',labels:['Reading aloud on a blanket','Napping in the sun'],bubbles:['📖','💤','🌸']});
 STALLS.slice(0,3).forEach(z=>homeAgent('shopper',{x:-27.5,z:z+rand(-.3,.3),fx:-31,fz:z},{pose:'idle',y:0,place:'the market',

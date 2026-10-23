@@ -231,9 +231,11 @@ export let boat;
   const seat=new THREE.Mesh(new THREE.BoxGeometry(.3,.06,.8),woodMat);seat.position.y=.3;boat.add(seat);
   boat.position.set(8,.05,13.3);scene.add(boat);
 }
-// Bus stop on the park-side sidewalk
-{
-  const g=new THREE.Group();g.position.set(17.3,0,-8.45);
+// Bus stops: one on the park-side sidewalk (eastbound), one on the avenue sidewalk (westbound)
+export const BUS_STOPS=[];
+function addBusStop(x,z,node,north){
+  const rot=north?Math.PI:0,s=north?-1:1;
+  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;
   for(const [px,pz] of [[-1.6,-.8],[1.6,-.8],[-1.6,.8],[1.6,.8]]){const p=new THREE.Mesh(new THREE.BoxGeometry(.08,2.3,.08),metalMat);p.position.set(px,1.15,pz);p.castShadow=true;g.add(p);}
   const roof=new THREE.Mesh(new THREE.BoxGeometry(3.5,.12,1.9),new THREE.MeshStandardMaterial({color:'#36424a',roughness:.6}));roof.position.y=2.33;roof.castShadow=true;g.add(roof);
   const glass=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.7,.04),new THREE.MeshStandardMaterial({color:'#9fd0e0',transparent:true,opacity:.28,roughness:.1}));glass.position.set(0,1.25,.8);g.add(glass);
@@ -241,12 +243,16 @@ export let boat;
   ad.position.set(1.62,1.15,0);g.add(ad);buildings.push({mat:ad.material,k:.9,th:.6});
   const bench=new THREE.Mesh(new THREE.BoxGeometry(2.4,.08,.4),woodMat);bench.position.set(0,.45,.5);g.add(bench);
   scene.add(g);
-  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,2.4,6),metalMat);pole.position.set(15.2,1.2,-9.3);scene.add(pole);
+  const poleX=x-2.1*s,poleZ=z-.85*s;
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,2.4,6),metalMat);pole.position.set(poleX,1.2,poleZ);scene.add(pole);
   const sg=new THREE.Mesh(new THREE.CircleGeometry(.32,12),new THREE.MeshStandardMaterial({map:pixTex(outline(textCanvas(16,16,'#2f6bd8','#ffffff','BUS',6))),side:THREE.DoubleSide}));
-  sg.position.set(15.2,2.35,-9.3);scene.add(sg);
-  SHELTERS.push({id:'bus',label:'Huddled at the bus stop until the rain eases',node:'BUS',
-    spots:[[-1.1,.45],[-.4,.5],[.35,.45],[1.05,.5],[-.8,-.2],[.6,-.25]].map(([dx,dz])=>({x:17.3+dx,z:-8.45+dz,fx:17.3+dx,fz:-14}))});
+  sg.position.set(poleX,2.35,poleZ);scene.add(sg);
+  SHELTERS.push({id:node,label:'Huddled at the bus stop until the rain eases',node,
+    spots:[[-1.1,.45],[-.4,.5],[.35,.45],[1.05,.5],[-.8,-.2],[.6,-.25]].map(([dx,dz])=>({x:x+dx*s,z:z+dz*s,fx:x+dx*s,fz:z-5.5*s}))});
+  BUS_STOPS.push({x,z,node,poleX,poleZ});
 }
+addBusStop(17.3,-8.45,'BUS',false);
+addBusStop(-13.5,-19.05,'BUSN',true);
 // Bike racks + parked bikes
 export const staticBillboards=[];
 function addRack(x,z){const r=new THREE.Mesh(new THREE.TorusGeometry(.32,.03,4,12,Math.PI),new THREE.MeshStandardMaterial({color:'#9aa3ad',metalness:.6,roughness:.4}));

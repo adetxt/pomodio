@@ -50,7 +50,7 @@ for(let i=0;i<SPLASH_N;i++){splashes.setMatrixAt(i,_m4.makeScale(0,0,0));splashe
 function spawnSplash(x,z){const i=splashI++%SPLASH_N;splashLife[i]=0;splashes.userData[i]={x,z};}
 
 export function updateParticles(dt,t,env){
-  const scale=bufSize.y/(camera.top-camera.bottom)*camera.zoom;
+  const scale=bufSize.y/(2*Math.tan(camera.fov*Math.PI/360)); // pixels per world unit at depth 1
   for(const c of clouds){c.mat.uniforms.uScale.value=scale;c.mat.uniforms.uTint.value.copy(env.tint);}
   // petals & leaves
   const wind=W.wind,act=Math.floor(petals.n*clamp(env.petals,0,1));

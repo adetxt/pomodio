@@ -26,7 +26,7 @@ export function loopAt(s){const n=LOOP_PTS.length,f=((s/.2)%n+n)%n,i=Math.floor(
     const end=p.pts[p.pts.length-1],eid=node(p.id+'end',end.x,end.z,'park'),st=p.pts[0];
     edge(nearestNode(st.x,st.z,n=>n.area==='fountain'),ids[0]);chain([...ids,eid]);toLoop(eid);}
   chain([node('S1',-14.75,-8.75,'walk'),node('S2',-6,-8.75,'walk'),node('S3',0,-8.75,'walk'),node('S4',6,-8.75,'walk'),node('S5',14.75,-8.75,'walk'),node('BUS',17.3,-8.75,'bus'),node('S6',22.5,-8.75,'walk')]);
-  chain([node('F1',-22.5,-17.7,'avenue'),node('F2',-14.75,-17.7,'avenue'),node('F3',-6,-17.7,'avenue'),node('F4',0,-17.7,'avenue'),node('F5',6,-17.7,'avenue'),node('F6',10,-17.7,'cafe'),node('F7',14.75,-17.7,'avenue'),node('F8',22.5,-17.7,'avenue')]);
+  chain([node('F1',-22.5,-17.7,'avenue'),node('F2',-14.75,-17.7,'avenue'),node('BUSN',-13.5,-17.7,'bus'),node('F3',-6,-17.7,'avenue'),node('F4',0,-17.7,'avenue'),node('F5',6,-17.7,'avenue'),node('F6',10,-17.7,'cafe'),node('F7',14.75,-17.7,'avenue'),node('F8',22.5,-17.7,'avenue')]);
   edge('S2','F3',true);edge('S4','F5',true);
   chain(['S1',node('W1',-14.75,-4,'walk'),node('W2',-14.75,0,'walk'),node('W3',-14.75,4,'walk'),node('P2',-14.75,9,'prom')]);
   chain([node('P1',-22.5,9,'prom'),'P2',node('P3',-7,9,'prom'),node('P4',0,9,'prom'),node('P5',7,9,'prom'),node('P6',14.75,9,'prom'),node('P7',22.5,9,'prom')]);
@@ -52,3 +52,6 @@ export function dijkstra(s,t){
   const path=[];let u=t;while(u!==undefined){path.unshift(u);u=prev[u];}return path[0]===s?path:[s,t];
 }
 export const isCross=(a,b)=>NODES[a].adj.some(e=>e.to===b&&e.cross);
+// vehicles on the avenue ({x,len}, kept current by traffic.js); pedestrians hold at a crossing while one is close
+export const vehicles=[];
+export const crossingClear=x=>vehicles.every(v=>Math.abs(v.x-x)>v.len/2+3);

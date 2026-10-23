@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { clamp, lerp, rand, smoothstep } from './utils.js';
 import { PRESETS, W, state } from './state.js';
-import { boltCv, boltG, camAz, passH, passV, scene } from './renderer.js';
+import { boltCv, boltG, camAz, camDist, passH, passV, scene } from './renderer.js';
 import { groundMat } from './ground.js';
 import { fogMats, waters } from './shaders.js';
 import { hemi, lampU, lamps, sun } from './lights.js';
@@ -48,7 +48,7 @@ export function updateEnvironment(dt,t){
   _c1.getRGB(_rgb,THREE.SRGBColorSpace);passV.uniforms.uTop.value.set(_rgb.r,_rgb.g,_rgb.b);
   _c2.getRGB(_rgb,THREE.SRGBColorSpace);passV.uniforms.uBot.value.set(_rgb.r,_rgb.g,_rgb.b);
   scene.fog.color.copy(_c2).lerp(FOG_DAY,.3*SK.day);
-  scene.fog.near=lerp(400,118,fogEff);scene.fog.far=lerp(600,215,fogEff);
+  scene.fog.near=camDist+lerp(250,-32,fogEff);scene.fog.far=camDist+lerp(450,65,fogEff); // relative to the orbit target so zooming keeps the haze
   // sun / moon
   const th=(h-6)/12*Math.PI,el=Math.sin(th),sunD=_v.set(Math.cos(th)*.9,Math.max(el,.16),.45).normalize();
   const moonMix=smoothstep(.12,-.1,el);sunD.lerp(MOON_DIR,moonMix).normalize();

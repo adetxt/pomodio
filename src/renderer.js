@@ -16,22 +16,24 @@ renderer.setClearColor(0x000000,0);
 
 export const scene=new THREE.Scene();
 scene.fog=new THREE.Fog(0x8899aa,400,600);
-export const camera=new THREE.OrthographicCamera(-1,1,1,-1,1,600);
-camera.zoom=1;
+// Narrow-FOV perspective from far away keeps the miniature look; the slight convergence keeps the ground reading as a
+// rectangle while orbiting (an orthographic view shears it into a parallelogram that the eye reads as a trapezium).
+const CAM_DIST=240;
+export const camera=new THREE.PerspectiveCamera(10,1,10,1000);
 export const controls=new OrbitControls(camera,canvasEl);
 controls.target.set(0,0,-3.5);
-camera.position.setFromSpherical(new THREE.Spherical(150,0.98,0.42)).add(controls.target);
+camera.position.setFromSpherical(new THREE.Spherical(CAM_DIST,0.98,0.42)).add(controls.target);
 Object.assign(controls,{enableDamping:true,dampingFactor:0.08,minPolarAngle:0.62,maxPolarAngle:1.22,minAzimuthAngle:-1.15,maxAzimuthAngle:1.15,
-  minZoom:0.8,maxZoom:4.5,rotateSpeed:0.45,zoomSpeed:2.4,screenSpacePanning:false});
+  minDistance:CAM_DIST/4.5,maxDistance:CAM_DIST/.8,rotateSpeed:0.45,zoomSpeed:2.4,screenSpacePanning:false});
 // camera follow: keep the target on the diorama and track the view azimuth for billboards
 export const camRight=new THREE.Vector3(1,0,0);
-export let camAz=0;
+export let camAz=0,camDist=CAM_DIST;
 const _off=new THREE.Vector3();
 export function updateCamera(){
   controls.update();
   _off.copy(camera.position).sub(controls.target);controls.target.x=clamp(controls.target.x,-30,30);controls.target.z=clamp(controls.target.z,-26,20);controls.target.y=0;
   camera.position.copy(controls.target).add(_off);
-  camAz=Math.atan2(_off.x,_off.z);camRight.setFromMatrixColumn(camera.matrixWorld,0);
+  camAz=Math.atan2(_off.x,_off.z);camDist=_off.length();camRight.setFromMatrixColumn(camera.matrixWorld,0);
 }
 
 export const rtScene=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:4});
@@ -128,7 +130,7 @@ export function resize(){
   const w=innerWidth,h=innerHeight,a=w/h;
   renderer.setSize(w,h,false);
   const vh=Math.max(23,44/a);
-  camera.left=-vh*a;camera.right=vh*a;camera.top=vh;camera.bottom=-vh;camera.updateProjectionMatrix();
+  camera.aspect=a;camera.fov=2*Math.atan(vh/CAM_DIST)*180/Math.PI;camera.updateProjectionMatrix(); // vh = half-height framed at the target
   renderer.getDrawingBufferSize(canvasSize);
   // the scene renders at state.res of the canvas; below full size it's upscaled unfiltered for crisp pixels
   bufSize.copy(canvasSize).multiplyScalar(clamp(state.res,.25,1)).floor().max(new THREE.Vector2(1,1));

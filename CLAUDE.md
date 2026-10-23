@@ -21,6 +21,7 @@ Pixel-art three.js park diorama + Pomodoro timer. Vanilla JS ES modules, built b
 - `src/sprites.js` — sprite sheets (people, bikes, dogs, umbrellas, bubbles)
 - `src/audio.js` — Web Audio engine `sound`, `syncAudioUI`
 - `src/citizens.js` — agents, roles, cast spawning
+- `src/traffic.js` — red double-decker bus driving the avenue between the two stops
 - `src/particles.js` — petals, dust, fireflies, rain, splashes
 - `src/weather.js` — time of day & weather (`env`, `updateEnvironment`, lightning)
 - `src/pomodoro.js` — timer logic (`pomo`)

@@ -6,6 +6,7 @@ import { camAz, camRight, camera, passCloud, passH, passV, quad, quadCam, quadSc
 import { boat, staticBillboards, trees } from './city.js';
 import { sound } from './audio.js';
 import { SPRITE_TILT, agents, marker } from './citizens.js';
+import { updateTraffic } from './traffic.js';
 import { updateParticles } from './particles.js';
 import { drawBolt, env, localHour, updateEnvironment } from './weather.js';
 import { selected, tod, todIcon, updateCard } from './ui.js';
@@ -31,6 +32,7 @@ function frame(now){
   for(const tr of trees){const w=.012+W.wind*.045;tr.crown.rotation.z=Math.sin(clock*1.3+tr.ph)*w;tr.crown.rotation.x=Math.sin(clock*1.05+tr.ph*1.7)*w*.7;}
   boat.position.y=.05+Math.sin(clock*1.2)*.03;boat.rotation.z=Math.sin(clock*.9)*.03;
   for(const a of agents){a.update(dt);a.billboard();}
+  updateTraffic(dt);
   for(const a of agents)if(a.leash){const o=a.owner,arr=a.leash.geometry.attributes.position.array;
     _hand.set(o.x+camRight.x*.28*o.facing,.62,o.z+camRight.z*.28*o.facing);_col2.set(a.x+camRight.x*.32*a.facing,a.anim==='sit'?.42:.36,a.z+camRight.z*.32*a.facing);
     arr[0]=_hand.x;arr[1]=_hand.y;arr[2]=_hand.z;arr[3]=_col2.x;arr[4]=_col2.y;arr[5]=_col2.z;a.leash.geometry.attributes.position.needsUpdate=true;}
