@@ -88,7 +88,7 @@ function moodOf(a){
 }
 const portrait=$('cardPortrait').getContext('2d');
 export function updateCard(){
-  const a=selected;if(!a)return;if(npcLocked())return closeCard();
+  const a=selected;if(!a)return;if(npcLocked()||!a.group.visible)return closeCard();
   $('cardName').textContent=a.name;$('cardRole').textContent=ROLE_TITLE[a.role]||a.role;$('cardAct').textContent=a.label;$('cardMood').textContent=moodOf(a);
   const pet=a.kind==='dog'||a.kind==='cat';$('cardTrack').textContent=pet?`${a.track} (allegedly)`:a.track;$('cardSteps').textContent=Math.floor(a.steps).toLocaleString()+(pet?' paw-steps':'');
   $('cardEnergy').style.width=Math.round(clamp(a.energy-(a.steps-5000)/60000,.1,1)*100)+'%';

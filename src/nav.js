@@ -54,4 +54,4 @@ export function dijkstra(s,t){
 export const isCross=(a,b)=>NODES[a].adj.some(e=>e.to===b&&e.cross);
 // vehicles on the avenue ({x,len}, kept current by traffic.js); pedestrians hold at a crossing while one is close
 export const vehicles=[];
-export const crossingClear=x=>vehicles.every(v=>Math.abs(v.x-x)>v.len/2+3);
+export const crossingClear=x=>vehicles.every(v=>v.active===false||Math.abs(v.x-x)>v.len/2+3);

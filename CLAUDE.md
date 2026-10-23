@@ -11,6 +11,8 @@ Pixel-art three.js park diorama + Pomodoro timer. Vanilla JS ES modules, built b
 - `src/main.js` — entry: imports CSS, main `frame()` loop
 - `src/utils.js` — math/random helpers, `store` (localStorage), `$`, `ico`
 - `src/state.js` — `state` (hour/live/weather/tilt), weather `PRESETS`, live weather blend `W`
+- `src/activity.js` — daily activity demand, staggered presence, walking destinations, bus frequency (pure logic)
+- `src/fishing.js` — timed fishing phases and catch outcomes (pure logic)
 - `src/renderer.js` — renderer, camera, OrbitControls, `updateCamera` (`camAz`/`camRight`), tilt-shift passes, `resize`
 - `src/textures.js` — procedural pixel textures
 - `src/ground.js` — city layout zones, ground canvas
