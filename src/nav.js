@@ -1,5 +1,5 @@
-import { lerp } from './utils.js';
-import { LOOP, PATHS } from './ground.js';
+import { LOOP, PATHS } from './layout.js';
+const lerp=(a,b,t)=>a+(b-a)*t;
 
 /* =====================================================================
    7. Navigation graph (sidewalks, crossings, park paths)
@@ -55,3 +55,36 @@ export const isCross=(a,b)=>NODES[a].adj.some(e=>e.to===b&&e.cross);
 // vehicles on the avenue ({x,len}, kept current by traffic.js); pedestrians hold at a crossing while one is close
 export const vehicles=[];
 export const crossingClear=x=>vehicles.every(v=>v.active===false||Math.abs(v.x-x)>v.len/2+3);
+
+// Only the footbridge is walkable between the quay walls. Clip a straight
+// segment to the water strip and check both ends of that clipped segment.
+function dryConnection(x0,z0,x1,z1){
+  if(Math.max(z0,z1)<=10||Math.min(z0,z1)>=14.24)return true;
+  let lo=0,hi=1;
+  if(z0!==z1){
+    const a=(10-z0)/(z1-z0),b=(14.24-z0)/(z1-z0);
+    lo=Math.max(0,Math.min(a,b));hi=Math.min(1,Math.max(a,b));
+  }
+  return [lo,hi].every(t=>{const x=lerp(x0,x1,t);return x>=-5.1&&x<=-2.9;});
+}
+
+export function routeSteps(a,tx,tz,o={}){
+  const rand=(a,b)=>a+(o.random||Math.random)()*(b-a);
+  const speed=o.speed||rand(1,1.25),anim=o.anim||'walk',label=o.label||'Strolling',steps=[];
+  if(Math.hypot(tx-a.x,tz-a.z)<2.2&&dryConnection(a.x,a.z,tx,tz)){steps.push({t:'move',x:tx,z:tz,speed,anim,label});return steps;}
+  const from=nearestNode(a.x,a.z,n=>dryConnection(a.x,a.z,n.x,n.z));
+  const to=nearestNode(tx,tz,n=>dryConnection(tx,tz,n.x,n.z)),ids=from===to?[from]:dijkstra(from,to);
+  // Validate the jitter too: even a safe graph attachment can graze the
+  // water if its waypoint is nudged toward the opposite bank.
+  const points=ids.map(id=>NODES[id]);
+  ids.forEach((id,i)=>{const n=NODES[id];
+    if(i>0&&isCross(ids[i-1],id)){steps.push({t:'wait',dur:o.hurry?0:rand(1,2.2),anim:'idle',label:'Looking both ways at the crossing',crossX:n.x});
+      steps.push({t:'move',x:n.x+rand(-.3,.3),z:n.z,speed:speed*1.1,anim,label:o.hurry?label:'Crossing the street'});}
+    else{
+      const p=i?steps.at(-1):a,next=points[i+1]||{x:tx,z:tz},x=n.x+rand(-.2,.2),z=n.z+rand(-.2,.2);
+      const safe=dryConnection(p.x,p.z,x,z)&&dryConnection(x,z,next.x,next.z);
+      steps.push({t:'move',x:safe?x:n.x,z:safe?z:n.z,speed,anim,label});
+    }});
+  steps.push({t:'move',x:tx,z:tz,speed,anim,label});
+  return steps;
+}

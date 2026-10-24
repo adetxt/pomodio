@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { TAU, hash2, hexRGB, jit, lerp, makeCanvas, pixTex, repTex } from './utils.js';
 import { scene } from './renderer.js';
 import { soilC } from './textures.js';
+import { LOOP, PATHS } from './layout.js';
+export { LOOP, PATHS } from './layout.js';
 
 /* =====================================================================
    3. Ground: one pixel-art canvas painted from the city layout
@@ -9,7 +11,6 @@ import { soilC } from './textures.js';
 export const GX0=-36,GZ0=-34,GW=72,GD=60,PPU=16;
 export const ZEBRA_X=[-27.5,-6,6,25.5],COURT={x0:27,x1:34,z0:-7,z1:-.5};
 const TY={GRASS:1,GRAVEL:2,ASPH:3,BIKE:4,WALK:5,PROM:6,PLAZA:7,CURB:8,ZEBRA:9,LINE:10,QUAY:11,BED:12,STONE:13,COBBLE:14,COURT:15};
-export const LOOP={bx:11.2,bz:6.4,r:2.5,hw:.65};
 function sdRoundBox(x,z,bx,bz,r){const qx=Math.abs(x)-(bx-r),qz=Math.abs(z)-(bz-r);return Math.hypot(Math.max(qx,0),Math.max(qz,0))+Math.min(Math.max(qx,qz),0)-r;}
 function zoneAt(x,z){
   if(z>=25.6)return TY.CURB;
@@ -38,13 +39,6 @@ function zoneAt(x,z){
   const rr=Math.hypot(x,z);if(rr<3.6)return rr>3.42?TY.CURB:TY.STONE;
   return TY.GRASS;
 }
-// Winding gravel paths: quadratic béziers from the fountain plaza out to the jogging loop.
-function bez(p0,p1,p2,step=.15){const len=Math.hypot(p1[0]-p0[0],p1[1]-p0[1])+Math.hypot(p2[0]-p1[0],p2[1]-p1[1]);const n=Math.ceil(len/step),o=[];
-  for(let i=0;i<=n;i++){const t=i/n,u=1-t;o.push({x:u*u*p0[0]+2*u*t*p1[0]+t*t*p2[0],z:u*u*p0[1]+2*u*t*p1[1]+t*t*p2[1]});}return o;}
-export const PATHS=[
-  {id:'N',pts:bez([0,-3.6],[1.3,-5],[0,-6.4])},{id:'S',pts:bez([0,3.6],[-1.3,5],[0,6.4])},
-  {id:'W',pts:bez([-3.6,0],[-7.4,-1.4],[-11.2,0])},{id:'E',pts:bez([3.6,0],[7.4,1.4],[11.2,0])},
-];
 const STUBS=[[-6,-6.4,-6,-8],[6,-6.4,6,-8],[0,6.4,0,8],[-11.2,0,-13,0],[11.2,0,13,0]];
 const BIKE_GLYPH=["...#..##.","..###.#..",".#.#.#.#.","#..#.#..#",".##...##."];
 const PALG={};
