@@ -11,7 +11,7 @@ const PROGS=[
   [{r:45,n:[55,60,64,67]},{r:41,n:[52,57,60,64]},{r:36,n:[52,55,59,62]},{r:43,n:[50,55,59,64]}],
 ];
 const PENTA=[72,74,76,79,81,84,86,88];
-export const CHANNELS=[['music','Lo-fi music'],['vinyl','Vinyl & tape'],['park','Birds & leaves'],['fountain','Fountain'],['rain','Rain'],['thunder','Thunder'],['city','City murmur']];
+export const CHANNELS=[['music','Lo-fi music'],['vinyl','Tape texture'],['park','Birds & leaves'],['fountain','Fountain'],['rain','Rain'],['thunder','Thunder'],['city','City murmur']];
 const CH_BASE={music:.55,vinyl:.55,park:.6,fountain:.4,rain:.9,thunder:1,city:.55};
 class SoundEngine{
   constructor(){
@@ -24,9 +24,11 @@ class SoundEngine{
     try{
       const ctx=this.ctx=new (window.AudioContext||window.webkitAudioContext)();
       const comp=ctx.createDynamicsCompressor();comp.threshold.value=-16;comp.ratio.value=3;comp.connect(ctx.destination);
-      this.out=ctx.createGain();this.out.connect(comp);
+      // Start silent so loops cannot burst at the default unity gain before
+      // applyLevels fades in the saved mix (or keeps muted entry silent).
+      this.out=ctx.createGain();this.out.gain.value=0;this.out.connect(comp);
       this.muffle=ctx.createBiquadFilter();this.muffle.type='lowpass';this.muffle.frequency.value=18000;this.muffle.connect(this.out);
-      this.ch={};for(const [k] of CHANNELS){const g=ctx.createGain();g.connect(k==='rain'||k==='thunder'?this.out:this.muffle);this.ch[k]=g;}
+      this.ch={};for(const [k] of CHANNELS){const g=ctx.createGain();g.gain.value=0;g.connect(k==='rain'||k==='thunder'?this.out:this.muffle);this.ch[k]=g;}
       this.chimeBus=ctx.createGain();this.chimeBus.gain.value=.9;this.chimeBus.connect(this.out);
       // shared reverb
       const ir=ctx.createBuffer(2,ctx.sampleRate*2.8,ctx.sampleRate);
@@ -107,11 +109,8 @@ class SoundEngine{
   // ---------- ambience ----------
   buildAmbience(){
     const ctx=this.ctx;
-    // vinyl crackle + tape hiss + rumble
-    const n=ctx.sampleRate*5,cb=ctx.createBuffer(1,n,ctx.sampleRate),d=cb.getChannelData(0);
-    for(let i=0;i<n;i++){if(Math.random()<.00035){const amp=rand(.2,1)*(Math.random()<.5?-1:1),len=randInt(8,40);for(let j=0;j<len&&i+j<n;j++)d[i+j]+=amp*Math.exp(-j/6)*(Math.random()*.6+.4);}
-      if(Math.random()<.00002){for(let j=0;j<300&&i+j<n;j++)d[i+j]+=.8*Math.exp(-j/60)*Math.sin(j*.3);}}
-    this.loop(cb,[this.filt('highpass',900),this.gain(.45)],this.ch.vinyl);
+    // Soft tape hiss + rumble, without synthetic vinyl clicks and pops.
+    // Keep the stored "vinyl" key to preserve existing mixer settings.
     this.loop(this.white,[this.filt('highpass',5200),this.gain(.035)],this.ch.vinyl);
     this.loop(this.brown,[this.filt('lowpass',70),this.gain(.35)],this.ch.vinyl);
     // fountain
