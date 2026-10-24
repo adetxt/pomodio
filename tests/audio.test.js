@@ -38,7 +38,7 @@ async function renderTape(muted){
     </script></body>`;
   const server=createServer(async(req,res)=>{
     if(req.url==='/'){res.setHeader('Content-Type','text/html');res.end(html);return;}
-    if(!['/src/audio.js','/src/utils.js','/src/state.js'].includes(req.url)){res.writeHead(404).end();return;}
+    if(!['/src/audio.js','/src/utils.js','/src/state.js','/src/weather-cycle.js'].includes(req.url)){res.writeHead(404).end();return;}
     res.setHeader('Content-Type','text/javascript');
     res.end(await readFile(new URL('..'+req.url,import.meta.url)));
   });

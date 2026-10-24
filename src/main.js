@@ -1,7 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
 import { $, clamp, ico } from './utils.js';
-import { W, state } from './state.js';
+import { W, advanceDynamicWeather, state } from './state.js';
 import { camAz, camRight, camera, passCloud, passH, passV, quad, quadCam, quadScene, renderer, resize, rtBlur, rtCloud, rtScene, scene, updateCamera } from './renderer.js';
 import { boat, staticBillboards, trees } from './city.js';
 import { sound } from './audio.js';
@@ -9,7 +9,7 @@ import { SPRITE_TILT, agents, marker } from './citizens.js';
 import { updateTraffic } from './traffic.js';
 import { updateParticles } from './particles.js';
 import { drawBolt, env, localHour, updateEnvironment } from './weather.js';
-import { selected, tod, todIcon, updateCard } from './ui.js';
+import { selected, syncWeatherUI, tod, todIcon, updateCard } from './ui.js';
 
 /* =====================================================================
    15. Main loop
@@ -23,7 +23,8 @@ function frame(now){
   const focusing=document.body.classList.contains('focusing');
   if(now<due-1){requestAnimationFrame(frame);return;}
   due=Math.max(due+1000/(focusing?30:60),now);
-  const dt=clamp((now-last)/1000,0,.05);last=now;clock+=dt;
+  const elapsed=(now-last)/1000,dt=clamp(elapsed,0,.05);last=now;clock+=dt;
+  if(advanceDynamicWeather(elapsed))syncWeatherUI();
   if(state.live)state.hour=localHour();
   todUi-=dt;if(todUi<0){todUi=.25;if(document.activeElement!==tod)tod.value=state.hour;const hh=Math.floor(state.hour),mm=Math.floor((state.hour-hh)*60);
     $('todText').textContent=`${String(hh%24).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;const ti=todIcon(state.hour);if($('todIcon').dataset.i!==ti){$('todIcon').dataset.i=ti;$('todIcon').innerHTML=ico(ti);}}
