@@ -16,6 +16,7 @@ Pixel-art three.js park diorama + Pomodoro timer. Vanilla JS ES modules, built b
 - `src/renderer.js` — renderer, camera, OrbitControls, `updateCamera` (`camAz`/`camRight`), tilt-shift passes, `resize`
 - `src/textures.js` — procedural pixel textures
 - `src/ground.js` — city layout zones, ground canvas
+- `src/layout.js` — shared path geometry without renderer dependencies
 - `src/shaders.js` — water, ground fog, particle shaders
 - `src/lights.js` — hemi + sun
 - `src/city.js` — buildings, lamps, trees, park props, fountain, canal, market, court

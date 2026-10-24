@@ -6,7 +6,7 @@ import { advanceFishing, createFishing, resetFishing } from './fishing.js';
 import { camAz, camRight, scene } from './renderer.js';
 import { COURT, GW, GX0 } from './ground.js';
 import { BUS_STOPS, PARK_TREES, SHELTERS, STALLS, canalSeats, fountainSeats, groundY, southSeats, staticBillboards } from './city.js';
-import { LOOP_LEN, NODES, crossingClear, dijkstra, isCross, loopAt, nearestNode } from './nav.js';
+import { LOOP_LEN, NODES, crossingClear, dijkstra, loopAt, routeSteps } from './nav.js';
 import { PX, UMBRELLAS, bikeSheet, bubbleTex, catSheet, dogSheet, markerTex, personParams, personSheet } from './sprites.js';
 import { sound } from './audio.js';
 
@@ -128,17 +128,6 @@ class Agent{
   }
 }
 // ---- planning helpers ----
-function routeSteps(a,tx,tz,o={}){
-  const speed=o.speed||rand(1,1.25),anim=o.anim||'walk',label=o.label||'Strolling',steps=[];
-  if(Math.hypot(tx-a.x,tz-a.z)<2.2){steps.push({t:'move',x:tx,z:tz,speed,anim,label});return steps;}
-  const from=nearestNode(a.x,a.z),to=nearestNode(tx,tz),ids=from===to?[from]:dijkstra(from,to);
-  ids.forEach((id,i)=>{const n=NODES[id];
-    if(i>0&&isCross(ids[i-1],id)){steps.push({t:'wait',dur:o.hurry?0:rand(1,2.2),anim:'idle',label:'Looking both ways at the crossing',crossX:n.x});
-      steps.push({t:'move',x:n.x+rand(-.3,.3),z:n.z,speed:speed*1.1,anim,label:o.hurry?label:'Crossing the street'});}
-    else steps.push({t:'move',x:n.x+rand(-.2,.2),z:n.z+rand(-.2,.2),speed,anim,label});});
-  steps.push({t:'move',x:tx,z:tz,speed,anim,label});
-  return steps;
-}
 // nearest shelter that still has a free spot (falls back to the nearest one when every shelter is full)
 function nearestShelter(x,z){const by=SHELTERS.map(s=>[s,Math.hypot(NODES[s.node].x-x,NODES[s.node].z-z)]).sort((a,b)=>a[1]-b[1]);
   return (by.find(([s])=>s.spots.some(p=>!p.taken))||by[0])[0];}
