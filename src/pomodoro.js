@@ -15,7 +15,9 @@ const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(s
 export function renderPomo(){
   const left=pomo.running?pomo.endAt-Date.now():pomo.left,total=pomo.dur[pomo.mode]*60000;
   $('pTime').textContent=$('miniTime').textContent=fmt(left);$('pLabel').textContent=MODE_LABEL[pomo.mode];
-  $('ringProg').style.strokeDashoffset=326.73*(1-clamp(left/total,0,1));$('ringProg').style.stroke=MODE_COLOR[pomo.mode];
+  for(const id of ['ringProg','miniRingProg']){
+    $(id).style.strokeDashoffset=326.73*(1-clamp(left/total,0,1));$(id).style.stroke=MODE_COLOR[pomo.mode];
+  }
   const pi=pomo.running?'pause':'play';if($('pPlay').dataset.i!==pi){$('pPlay').dataset.i=pi;$('pPlay').innerHTML=ico(pi);}
   document.querySelectorAll('#pTabs button').forEach(b=>b.classList.toggle('on',b.dataset.mode===pomo.mode));
   const inCycle=pomo.count%pomo.dur.every;
@@ -23,7 +25,8 @@ export function renderPomo(){
   document.title=pomo.running?`${fmt(left)} · ${MODE_LABEL[pomo.mode]} — Pomodio`:'Pomodio — Pixel Park Sanctuary';
   document.body.classList.toggle('focusing',pomo.running&&pomo.mode==='focus'&&pomo.dim);
 }
-export function setMode(m,autostart=false){pomo.mode=m;pomo.running=false;pomo.left=pomo.dur[m]*60000;if(autostart)togglePomo();renderPomo();}
+export function setMode(m,autostart=false){pomo.mode=m;pomo.running=false;pomo.endAt=0;pomo.left=pomo.dur[m]*60000;if(autostart)togglePomo();renderPomo();}
+export function resetPomo(){setMode(pomo.mode,pomo.running);}
 export function togglePomo(){
   if(pomo.running){pomo.left=pomo.endAt-Date.now();pomo.running=false;}
   else{pomo.endAt=Date.now()+pomo.left;pomo.running=true;if(pomo.mode==='focus'&&sound.autoPaused){sound.autoPaused=false;sound.setMusic(true);syncAudioUI();}}

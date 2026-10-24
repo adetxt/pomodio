@@ -1,19 +1,19 @@
 import * as THREE from 'three';
 import { $, clamp, ico, pick, store } from './utils.js';
-import { PRESETS, W, state } from './state.js';
+import { PRESETS, W, setDynamicWeather, setWeather, state } from './state.js';
 import { camera, canvasEl, resize } from './renderer.js';
 import { CHANNELS, sound, syncAudioUI } from './audio.js';
 import { ROLE_MOOD, ROLE_TITLE, marker, pickables, raining } from './citizens.js';
 import { env } from './weather.js';
-import { finishPomo, npcLocked, pomo, renderPomo, setMode, toast, togglePomo } from './pomodoro.js';
+import { finishPomo, npcLocked, pomo, renderPomo, resetPomo, setMode, toast, togglePomo } from './pomodoro.js';
 
 /* =====================================================================
    14. UI wiring
    ===================================================================== */
 document.querySelectorAll('#pTabs button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
-$('pPlay').onclick=togglePomo;$('pSkip').onclick=()=>finishPomo(false);$('pReset').onclick=()=>setMode(pomo.mode);
+$('pPlay').onclick=togglePomo;$('pSkip').onclick=()=>finishPomo(false);$('pReset').onclick=resetPomo;
 $('pCfgBtn').onclick=()=>{$('pCfg').hidden=!$('pCfg').hidden;$('pCfgBtn').classList.toggle('open',!$('pCfg').hidden);};
-$('pMin').onclick=()=>{$('pomo').classList.toggle('mini');$('pMin').innerHTML=ico($('pomo').classList.contains('mini')?'expand':'minus');};
+$('pMin').onclick=()=>{const mini=$('pomo').classList.toggle('mini');$('pMin').innerHTML=ico(mini?'expand':'minus');$('pMin').title=mini?'Expand timer':'Compact timer';};
 for(const [id,key,min,max] of [['dFocus','focus',1,180],['dShort','short',1,60],['dLong','long',1,90],['dEvery','every',2,12]]){
   const el=$(id);el.value=pomo.dur[key];
   el.onchange=()=>{pomo.dur[key]=clamp(Math.round(+el.value)||pomo.dur[key],min,max);el.value=pomo.dur[key];store.set('dur',pomo.dur);
@@ -29,8 +29,17 @@ tod.oninput=()=>{setLive(false);state.hour=+tod.value;};
 $('liveBtn').onclick=()=>setLive(!state.live);
 export function todIcon(h){return h<5||h>=20.5?'moon':h<7.5||(h>=16.8&&h<19.5)?'sunrise':h<16.8?'sun':'moon';}
 // weather
-function setWeather(w){state.weather=w;store.set('weather',w);document.querySelectorAll('#weatherRow button').forEach(b=>b.classList.toggle('on',b.dataset.w===w));}
-document.querySelectorAll('#weatherRow button').forEach(b=>b.onclick=()=>setWeather(b.dataset.w));
+export function syncWeatherUI(){
+  document.querySelectorAll('#weatherRow button').forEach(b=>{
+    const selected=b.dataset.w===state.weather;b.classList.toggle('on',selected);b.setAttribute('aria-checked',String(selected));
+  });
+  $('dynamicWeather').classList.toggle('on',state.dynamicWeather);
+  $('dynamicWeather').setAttribute('aria-pressed',String(state.dynamicWeather));
+  const label={clear:'Clear',overcast:'Overcast',fog:'Foggy',drizzle:'Drizzle',rain:'Rain',storm:'Storm'}[state.weather];
+  $('weatherStatus').textContent=state.dynamicWeather?`${label} · changing gradually`:'Choose your weather';
+}
+document.querySelectorAll('#weatherRow button').forEach(b=>{b.setAttribute('role','radio');b.onclick=()=>{setWeather(b.dataset.w);syncWeatherUI();};});
+$('dynamicWeather').onclick=()=>{setDynamicWeather(!state.dynamicWeather);syncWeatherUI();};
 // sound
 $('mixer').innerHTML=CHANNELS.map(([k,n])=>`<label>${n}<input type="range" min="0" max="1" step="0.01" data-ch="${k}"></label>`).join('')+
   `<label class="chk"><input type="checkbox" id="autoPause">Pause music when focus ends</label>`;
@@ -56,7 +65,7 @@ addEventListener('keydown',e=>{
 });
 // deep link: #t=18.5&w=rain
 {const q=new URLSearchParams(location.hash.slice(1));if(q.has('t')){setLive(false);state.hour=clamp(+q.get('t'),0,24);}if(q.has('w')&&PRESETS[q.get('w')]){setWeather(q.get('w'));Object.assign(W,PRESETS[q.get('w')]);}}
-setLive(state.live);setWeather(state.weather);syncAudioUI();renderPomo();
+setLive(state.live);syncWeatherUI();syncAudioUI();renderPomo();
 // filled-track sliders
 const paintRange=el=>el.style.setProperty('--p',((el.value-el.min)/(el.max-el.min)*100)+'%');
 document.addEventListener('input',e=>{if(e.target.type==='range')paintRange(e.target);});

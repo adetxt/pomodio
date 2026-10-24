@@ -42,7 +42,10 @@
 <section id="pomo" class="panel" aria-label="Pomodoro timer">
   <div class="head">
     <div class="seg" id="pTabs" role="tablist"><button data-mode="focus">Focus</button><button data-mode="short">Short</button><button data-mode="long">Long</button></div>
-    <span id="miniTime">25:00</span>
+    <div id="miniTimer">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="52"/><circle id="miniRingProg" cx="60" cy="60" r="52" stroke-dasharray="326.73" stroke-dashoffset="0"/></svg>
+      <span id="miniTime">25:00</span>
+    </div>
     <button id="pMin" class="icon ghost" title="Compact timer"><svg class="i"><use href="#i-minus"/></svg></button>
   </div>
   <div class="ring">
@@ -74,6 +77,10 @@
     <span id="todText">12:00</span>
     <button id="liveBtn" title="Sync with your local time"><span class="dot"></span>Live</button>
   </div>
+  <div class="row weatherMode">
+    <button id="dynamicWeather" aria-pressed="false" title="Let weather evolve naturally every 5–12 minutes"><svg class="i"><use href="#i-sunrise"/></svg>Dynamic weather</button>
+    <span id="weatherStatus" aria-live="polite">Choose your weather</span>
+  </div>
   <div class="seg" id="weatherRow" role="radiogroup" aria-label="Weather">
     <button data-w="clear" title="Clear"><svg class="i"><use href="#i-sun"/></svg><span class="t">Clear</span></button>
     <button data-w="overcast" title="Overcast"><svg class="i"><use href="#i-cloud"/></svg><span class="t">Overcast</span></button>
@@ -82,7 +89,7 @@
     <button data-w="rain" title="Rain"><svg class="i"><use href="#i-rain"/></svg><span class="t">Rain</span></button>
     <button data-w="storm" title="Storm"><svg class="i"><use href="#i-storm"/></svg><span class="t">Storm</span></button>
   </div>
-  <div class="row">
+  <div class="row audioRow">
     <button id="muteBtn" class="icon" title="Mute (M)"><svg class="i"><use href="#i-volume"/></svg></button>
     <input type="range" id="vol" min="0" max="1" step="0.01" aria-label="Master volume">
     <button id="musicBtn" title="Lo-fi music on/off"><svg class="i"><use href="#i-music"/></svg><span>Music</span></button>

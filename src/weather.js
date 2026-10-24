@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clamp, lerp, rand, smoothstep } from './utils.js';
 import { PRESETS, W, state } from './state.js';
+import { blendWeather } from './weather-cycle.js';
 import { boltCv, boltG, camAz, camDist, passH, passV, scene } from './renderer.js';
 import { groundMat } from './ground.js';
 import { fogMats, waters } from './shaders.js';
@@ -34,8 +35,7 @@ let flash=0,boltLife=0,boltPath=null,nextStrike=rand(4,9);
 export const localHour=()=>{const d=new Date();return d.getHours()+d.getMinutes()/60+d.getSeconds()/3600;};
 export const env={hour:12,day:1,night:0,golden:0,tint:new THREE.Color(1,1,1),petals:1};
 export function updateEnvironment(dt,t){
-  const T=PRESETS[state.weather],k=Math.min(1,dt*.45);
-  for(const key of Object.keys(T))W[key]+=(T[key]-W[key])*k;
+  blendWeather(W,PRESETS[state.weather],dt,state.dynamicWeather);
   state.wet=clamp(state.wet+(W.rain>.15?dt*W.rain*.12:-dt*.018),0,1);
   if(W.rain>.22)setRaining(true);else if(W.rain<.1)setRaining(false);
   const h=state.hour;sampleSky(h);

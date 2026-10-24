@@ -51,7 +51,7 @@ input[type=number]{width:52px;height:28px;font:500 13px var(--sans);color:var(--
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke-width:6}
 .ring .track{stroke:rgba(255,255,255,.08)}
-#ringProg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .3s linear,stroke .4s}
+#ringProg,#miniRingProg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .3s linear,stroke .4s}
 .ring .txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 #pTime{font:600 38px/1 var(--sans);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 #pLabel{margin-top:8px;color:var(--dim);font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase}
@@ -71,10 +71,14 @@ input[type=number]{width:52px;height:28px;font:500 13px var(--sans);color:var(--
 #pCfg .num{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--dim)}
 #pCfg .num span{display:inline-flex;align-items:center;gap:6px;color:var(--faint);font-size:11.5px}
 .chk{display:flex;align-items:center;gap:8px;color:var(--dim);cursor:pointer;font-size:12.5px}
-#miniTime{display:none;font:600 20px/1 var(--sans);font-variant-numeric:tabular-nums;padding:0 4px}
+#miniTimer{display:none;align-items:center;gap:8px;padding:0 4px}
+#miniTimer svg{width:30px;height:30px;transform:rotate(-90deg);flex:none}
+#miniTimer circle{fill:none;stroke-width:8}
+#miniTimer .track{stroke:rgba(255,255,255,.12)}
+#miniTime{font:600 20px/1 var(--sans);font-variant-numeric:tabular-nums}
 #pomo.mini{display:flex;align-items:center;gap:8px;width:auto;padding:8px}
 #pomo.mini .head{display:contents}
-#pomo.mini #miniTime{display:block;order:1}
+#pomo.mini #miniTimer{display:flex;order:1}
 #pomo.mini .ctrls{order:2}
 #pomo.mini #pMin{order:3}
 #pomo.mini .ring,#pomo.mini #pDots,#pomo.mini #pCfg,#pomo.mini .cfgToggle,#pomo.mini #pTabs,#pomo.mini #pReset,#pomo.mini #pSkip{display:none!important}
@@ -83,9 +87,12 @@ input[type=number]{width:52px;height:28px;font:500 13px var(--sans);color:var(--
 
 /* ---------- Control deck ---------- */
 #deck{left:50%;bottom:16px;transform:translateX(-50%);width:min(800px,calc(100vw - 32px));padding:12px;display:grid;gap:10px}
+#deck>*{min-width:0}
 body.focusing #deck,body.focusing #hint{opacity:.18}
 body.focusing #deck:hover{opacity:1}
 .row{display:flex;align-items:center;gap:8px}
+.weatherMode{justify-content:space-between;gap:12px}
+#weatherStatus{color:var(--dim);font-size:11.5px;text-align:right}
 .spacer{flex:1}
 .divider{width:1px;height:20px;background:var(--edge);flex:none}
 #todIcon{width:var(--h);height:var(--h);display:grid;place-items:center;color:var(--accent);flex:none}
@@ -143,6 +150,11 @@ button.primary:hover{background:#ffc68f;border-color:transparent}
 @media (max-width:700px){
   #pomo{top:10px;right:10px;transform:scale(.88);transform-origin:top right}
   #deck{bottom:10px;width:calc(100vw - 20px)}
+  .audioRow{flex-wrap:wrap}
+  .audioRow #vol{flex:1 1 70px;width:auto}
+  .audioRow .spacer{display:none}
+  .audioRow .tilt{flex:1}
+  .audioRow #tilt{flex:1;width:70px}
   #hint{display:none}
   #card{top:auto;bottom:250px;left:10px}
 }
